@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Upload Video/Image - YOLOv8</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+
+        header {
+            background-color: #002147;
+            padding: 10px 0;
+            color: white;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            left: 0;
+            z-index: 1000;
+        }
+
+        header .container {
+            width: 80%;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header .logo {
+            display: flex;
+            align-items: center;
+        }
+
+        header .logo img {
+            height: 40px;
+            margin-right: 10px;
+        }
+
+        header .logo span {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        header nav ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+        }
+
+        header nav ul li {
+            margin-left: 20px;
+        }
+
+        header nav ul li a {
+            color: white;
+            text-decoration: none;
+            font-size: 16px;
+            transition: color 0.3s;
+        }
+
+        header nav ul li a:hover {
+            color: #1e90ff;
+        }
+
+        .main-content {
+            margin-top: 100px;
+            padding: 20px 0;
+        }
+
+        .container {
+            width: 80%;
+            margin: 0 auto;
+        }
+
+        .section-title {
+            font-size: 32px;
+            margin-bottom: 20px;
+            text-align: center;
+            color: #002147;
+        }
+
+        .section-description {
+            font-size: 18px;
+            margin-bottom: 40px;
+            text-align: center;
+            color: #555;
+        }
+
+        .content-area {
+            text-align: center;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .new {
+            color: black;
+            margin: 0px;
+            padding: 10px;
+            background-color: green;
+            margin: 20px auto;
+            display: inline-block;
+        }
+
+        footer {
+            background-color: #002147;
+            color: white;
+            padding: 20px 0;
+            text-align: center;
+        }
+
+        footer p {
+            margin: 0;
+            font-size: 14px;
+        }
+
+        #chatbot {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 300px;
+            background-color: #002147;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            color: white;
+            font-family: Arial, sans-serif;
+            z-index: 1000;
+        }
+
+        #chatbot-header {
+            padding: 10px;
+            background-color: #004080;
+            border-radius: 10px 10px 0 0;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        #chatbot-body {
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        #chatbot-messages {
+            margin-bottom: 10px;
+        }
+
+        #chatbot-messages div {
+            margin: 5px 0;
+        }
+
+        #chatbot-options {
+            padding: 10px;
+            text-align: center;
+            border-top: 1px solid #004080;
+        }
+
+        .chatbot-option {
+            background-color: #004080;
+            color: white;
+            border: none;
+            padding: 10px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .chatbot-option:hover {
+            background-color: #1e90ff;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="container">
+            <div class="logo">
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="/home">Home</a></li>
+                    <li><a href="/FrontPage">Video/Image</a></li>
+                    <li><a href="/webcam">Live Webcam</a></li>
+                    <li><a href="/contact">Contact</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="main-content">
+        <div class="container">
+            <div class="section-title">Upload Video or Image</div>
+            <div class="section-description">Submit your video or image for PPE Kit Detection.</div>
+            <div class="content-area">
+                <form method='POST' enctype="multipart/form-data" style="align-content: center; text-align: center;">
+                    {{form.hidden_tag()}}
+                    {{form.file(class_="custom-file-input")}}
+
+                    <div class="new">
+                        <button type="submit" name="favorite" value="x" class="btnCustom">
+                            Submit
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <section class="col-sm">
+        <img src="{{ url_for('video') }}" alt="Uploaded video">
+    </section>
+
+
+    <div id="chatbot">
+        <div id="chatbot-header">Safety Bot</div>
+        <div id="chatbot-body">
+            <div id="chatbot-messages"></div>
+        </div>
+        <div id="chatbot-options">
+            <button class="chatbot-option" data-option="NO-Hardhat">No Hardhat</button>
+            <button class="chatbot-option" data-option="NO-Mask">No Mask</button>
+            <button class="chatbot-option" data-option="NO-Safety Vest">No Safety Vest</button>
+        </div>
+    </div>
+
+    <script>
+        const safetyTips = {
+            "NO-Hardhat": "Not wearing a hardhat can lead to severe head injuries due to falling objects or impact.",
+            "NO-Mask": "Not wearing a mask increases the risk of exposure to airborne hazards and infectious agents.",
+            "NO-Safety Vest": "Not wearing a safety vest makes you less visible, increasing the risk of accidents in low-light conditions."
+        };
+
+        document.querySelectorAll('.chatbot-option').forEach(button => {
+            button.addEventListener('click', function() {
+                const userInput = this.dataset.option;
+                const chatbotMessages = document.getElementById('chatbot-messages');
+                chatbotMessages.innerHTML += <div>User selected: ${userInput.replace("NO-", "No ")}</div>;
+
+                if (safetyTips[userInput]) {
+                    chatbotMessages.innerHTML += <div>Bot: ${safetyTips[userInput]}</div>;
+                } else {
+                    chatbotMessages.innerHTML += <div>Bot: I'm not sure about that. Please select a valid option.</div>;
+                }
+
+                chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
+            });
+        });
+    </script>
+</body>
+</html>
