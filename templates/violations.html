@@ -3,181 +3,471 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PPE Violations Dashboard</title>
+    <title>PPE Violations Dashboard - VigilEdge</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            background-color: #f5f5f5;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+
+        /* Side Navigation */
+        .sidenav {
+            height: 100vh;
+            width: 250px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            background-color: #ffffff;
+            padding-top: 20px;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            z-index: 1000;
+            border-right: 1px solid #e8f5e8;
+        }
+
+        .sidenav .brand {
+            display: flex;
+            align-items: center;
+            padding: 0 20px 30px 20px;
+            border-bottom: 1px solid #e8f5e8;
+            margin-bottom: 20px;
+        }
+
+        .sidenav .brand .logo {
+            width: 40px;
+            height: 40px;
+            background-color: #27ae60;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            color: white;
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .sidenav .brand .brand-text {
+            color: #2d5a2d;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .sidenav .brand .brand-subtitle {
+            color: #5a8a5a;
+            font-size: 12px;
+            margin-top: 2px;
+        }
+
+        .sidenav .nav-item {
+            display: block;
+            padding: 12px 20px;
+            color: #5a8a5a;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .sidenav .nav-item:hover {
+            background-color: #f8fdf8;
+            color: #27ae60;
+            border-left-color: #27ae60;
+            transform: translateX(5px);
+            box-shadow: 0 2px 8px rgba(39, 174, 96, 0.2);
+        }
+
+        .sidenav .nav-item.active {
+            background-color: #f0f8f0;
+            color: #27ae60;
+            border-left-color: #27ae60;
+        }
+
+        .sidenav .nav-item i {
+            margin-right: 10px;
+            width: 20px;
+            text-align: center;
+        }
+
+        /* Main content area */
+        .main-content {
+            margin-left: 250px;
+            padding: 30px;
+            min-height: 100vh;
         }
         .container {
             max-width: 1200px;
             margin: 0 auto;
-            background: white;
-            padding: 20px;
+        }
+
+        .page-header {
+            background-color: white;
+            padding: 20px 0;
+            margin-bottom: 30px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .header {
             text-align: center;
-            color: #333;
-            margin-bottom: 30px;
         }
+
+        .section-title {
+            font-size: 28px;
+            margin: 0;
+            color: #2d5a2d;
+            font-weight: 600;
+        }
+
+        .section-description {
+            font-size: 16px;
+            margin: 8px 0 0 0;
+            color: #5a8a5a;
+        }
+
         .summary {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 20px;
             margin-bottom: 30px;
         }
+
         .summary-card {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
             text-align: center;
-            border-left: 4px solid #007bff;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            border-left: 4px solid #27ae60;
         }
+
+        .summary-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .summary-card.hardhat {
+            border-left-color: #27ae60;
+        }
+
+        .summary-card.mask {
+            border-left-color: #2ecc71;
+        }
+
+        .summary-card.vest {
+            border-left-color: #16a085;
+        }
+
+        .summary-card.total {
+            border-left-color: #1e8449;
+        }
+
         .summary-card h3 {
-            margin: 0 0 10px 0;
-            color: #333;
+            margin: 0 0 15px 0;
+            color: #2d5a2d;
+            font-size: 16px;
+            font-weight: 600;
         }
+
         .summary-card .number {
-            font-size: 24px;
+            font-size: 32px;
             font-weight: bold;
-            color: #007bff;
+            margin-bottom: 5px;
+        }
+
+        .summary-card.hardhat .number {
+            color: #27ae60;
+        }
+
+        .summary-card.mask .number {
+            color: #2ecc71;
+        }
+
+        .summary-card.vest .number {
+            color: #16a085;
+        }
+
+        .summary-card.total .number {
+            color: #1e8449;
+        }
+
+        .summary-card .icon {
+            font-size: 24px;
+            margin-bottom: 10px;
+            display: block;
         }
         .violations-list {
-            margin-top: 20px;
-        }
-        .violation-item {
             background: white;
-            border: 1px solid #ddd;
             border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 10px;
-            border-left: 4px solid #dc3545;
+            padding: 25px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
+
+        .violations-list h2 {
+            margin: 0 0 20px 0;
+            color: #2d5a2d;
+            font-size: 22px;
+            font-weight: 600;
+        }
+
+        .violation-item {
+            background: #f8fdf8;
+            border: 1px solid #e8f5e8;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-left: 4px solid #27ae60;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .violation-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
         .violation-item.no-hardhat {
-            border-left-color: #dc3545;
+            border-left-color: #27ae60;
         }
+
         .violation-item.no-mask {
-            border-left-color: #fd7e14;
+            border-left-color: #2ecc71;
         }
+
         .violation-item.no-safety-vest {
-            border-left-color: #ffc107;
+            border-left-color: #16a085;
         }
+
         .violation-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
         }
+
         .violation-type {
-            font-weight: bold;
-            color: #dc3545;
+            font-weight: 600;
+            font-size: 16px;
+            color: #2d5a2d;
         }
+
         .violation-time {
-            color: #6c757d;
-            font-size: 0.9em;
+            color: #5a8a5a;
+            font-size: 14px;
+            background: #f0f8f0;
+            padding: 4px 8px;
+            border-radius: 4px;
         }
+
         .violation-details {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 10px;
-            font-size: 0.9em;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            font-size: 14px;
             color: #495057;
         }
+
+        .violation-details div {
+            background: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #e8f5e8;
+        }
+
+        .violation-details strong {
+            color: #2d5a2d;
+        }
+
         .refresh-btn {
-            background: #007bff;
+            background: #27ae60;
             color: white;
             border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
+            padding: 12px 24px;
+            border-radius: 6px;
             cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background-color 0.3s ease;
             margin-bottom: 20px;
         }
+
         .refresh-btn:hover {
-            background: #0056b3;
+            background: #229954;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #5a8a5a;
+            font-style: italic;
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .sidenav {
+                width: 200px;
+            }
+            
+            .main-content {
+                margin-left: 200px;
+                padding: 20px;
+            }
+            
+            .summary {
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            }
+            
+            .violation-details {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>PPE Violations Dashboard</h1>
-            <button class="refresh-btn" onclick="loadViolations()">Refresh Data</button>
+
+    <!-- Side Navigation -->
+    <div class="sidenav">
+        <div class="brand">
+            <div class="logo">P</div>
+            <div>
+                <div class="brand-text">PPE Kit Detection</div>
+                <div class="brand-subtitle">AI Safety Monitoring</div>
+            </div>
         </div>
         
-        <div class="summary" id="summary">
-            <!-- Summary cards will be loaded here -->
-        </div>
-        
-        <div class="violations-list">
-            <h2>Recent Violations</h2>
-            <div id="violations-container">
-                <!-- Violations will be loaded here -->
+        <a href="/home" class="nav-item">
+            <i>🏠</i> Home
+        </a>
+        <a href="/FrontPage" class="nav-item">
+            <i>📹</i> Video/Image
+        </a>
+        <a href="/webcam" class="nav-item">
+            <i>📷</i> Live Webcam
+        </a>
+        <a href="/violations" class="nav-item active">
+            <i>⚠️</i> Violations
+        </a>
+        <a href="/contact" class="nav-item">
+            <i>📞</i> Contact
+        </a>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="container">
+            <div class="page-header">
+                <h1 class="section-title">PPE Violations Dashboard</h1>
+                <p class="section-description">Monitor and track safety violations in real-time</p>
+            </div>
+            
+            <button class="refresh-btn" onclick="loadViolations()">🔄 Refresh Data</button>
+            
+            <div class="summary" id="summary">
+                <!-- Summary cards will be loaded here -->
+                <div class="summary-card total">
+                    <span class="icon">📊</span>
+                    <h3>Total Violations</h3>
+                    <div class="number" id="total-count">0</div>
+                </div>
+                <div class="summary-card hardhat">
+                    <span class="icon">⛑️</span>
+                    <h3>No Hardhat</h3>
+                    <div class="number" id="hardhat-count">0</div>
+                </div>
+                <div class="summary-card mask">
+                    <span class="icon">😷</span>
+                    <h3>No Mask</h3>
+                    <div class="number" id="mask-count">0</div>
+                </div>
+                <div class="summary-card vest">
+                    <span class="icon">🦺</span>
+                    <h3>No Safety Vest</h3>
+                    <div class="number" id="vest-count">0</div>
+                </div>
+            </div>
+            
+            <div class="violations-list">
+                <h2>Recent Violations</h2>
+                <div id="violations-container">
+                    <!-- Violations will be loaded here -->
+                    <div class="no-data">Loading violations data...</div>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
+        // Set active navigation item
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentPath = window.location.pathname;
+            const navItems = document.querySelectorAll('.nav-item');
+            
+            navItems.forEach(item => {
+                item.classList.remove('active');
+                if (item.getAttribute('href') === currentPath || 
+                    (currentPath.includes('violations') && item.getAttribute('href') === '/violations')) {
+                    item.classList.add('active');
+                }
+            });
+        });
+
         function loadViolations() {
             // Load summary
             fetch('/violations/summary')
                 .then(response => response.json())
                 .then(data => {
-                    const summaryDiv = document.getElementById('summary');
-                    summaryDiv.innerHTML = `
-                        <div class="summary-card">
-                            <h3>Total Violations</h3>
-                            <div class="number">${data.total_violations}</div>
-                        </div>
-                        <div class="summary-card">
-                            <h3>NO-Hardhat</h3>
-                            <div class="number">${data.violation_types['NO-Hardhat'] || 0}</div>
-                        </div>
-                        <div class="summary-card">
-                            <h3>NO-Mask</h3>
-                            <div class="number">${data.violation_types['NO-Mask'] || 0}</div>
-                        </div>
-                        <div class="summary-card">
-                            <h3>NO-Safety Vest</h3>
-                            <div class="number">${data.violation_types['NO-Safety Vest'] || 0}</div>
-                        </div>
-                    `;
+                    document.getElementById('total-count').textContent = data.total_violations || 0;
+                    document.getElementById('hardhat-count').textContent = data.violation_types['NO-Hardhat'] || 0;
+                    document.getElementById('mask-count').textContent = data.violation_types['NO-Mask'] || 0;
+                    document.getElementById('vest-count').textContent = data.violation_types['NO-Safety Vest'] || 0;
                 })
-                .catch(error => console.error('Error loading summary:', error));
+                .catch(error => {
+                    console.error('Error loading summary:', error);
+                    // Set default values on error
+                    document.getElementById('total-count').textContent = '0';
+                    document.getElementById('hardhat-count').textContent = '0';
+                    document.getElementById('mask-count').textContent = '0';
+                    document.getElementById('vest-count').textContent = '0';
+                });
 
             // Load violations
             fetch('/violations')
                 .then(response => response.json())
                 .then(data => {
                     const container = document.getElementById('violations-container');
-                    if (data.violations.length === 0) {
-                        container.innerHTML = '<p>No violations recorded yet.</p>';
+                    if (!data.violations || data.violations.length === 0) {
+                        container.innerHTML = '<div class="no-data">🛡️ No violations recorded yet. This is good news for workplace safety!</div>';
                         return;
                     }
                     
                     container.innerHTML = data.violations.map(violation => {
                         const violationType = violation.violation_type || 'Unknown';
                         const cssClass = violationType.toLowerCase().replace(/[^a-z]/g, '-');
+                        const confidence = violation.confidence ? (violation.confidence * 100).toFixed(1) : 'N/A';
+                        const timestamp = violation.timestamp ? new Date(violation.timestamp).toLocaleString() : 'Unknown';
                         
                         return `
                             <div class="violation-item ${cssClass}">
                                 <div class="violation-header">
-                                    <span class="violation-type">${violationType}</span>
-                                    <span class="violation-time">${new Date(violation.timestamp).toLocaleString()}</span>
+                                    <span class="violation-type">⚠️ ${violationType}</span>
+                                    <span class="violation-time">${timestamp}</span>
                                 </div>
                                 <div class="violation-details">
-                                    <div><strong>Confidence:</strong> ${(violation.confidence * 100).toFixed(1)}%</div>
+                                    <div><strong>Confidence:</strong> ${confidence}%</div>
                                     <div><strong>Person ID:</strong> ${violation.person_id || 'N/A'}</div>
                                     <div><strong>Frame:</strong> ${violation.frame_number || 'N/A'}</div>
-                                    <div><strong>Location:</strong> (${violation.bounding_box.x1}, ${violation.bounding_box.y1})</div>
+                                    <div><strong>Location:</strong> ${violation.bounding_box ? 
+                                        `(${violation.bounding_box.x1}, ${violation.bounding_box.y1})` : 'N/A'}</div>
                                 </div>
                             </div>
                         `;
                     }).join('');
                 })
-                .catch(error => console.error('Error loading violations:', error));
+                .catch(error => {
+                    console.error('Error loading violations:', error);
+                    document.getElementById('violations-container').innerHTML = 
+                        '<div class="no-data">❌ Error loading violations data. Please try refreshing the page.</div>';
+                });
         }
 
         // Load data when page loads

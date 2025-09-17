@@ -12,6 +12,7 @@ import logging
 import json
 import os
 from datetime import datetime
+import torch
 
 
 last_email_time = 0
@@ -158,7 +159,16 @@ def video_detection(path_x, email_recipient, sms_recipient):
     if not cap.isOpened():
         print(f"Error: Could not open video {path_x}")
         return
+    
+    # Initialize YOLO model with GPU support
     model = YOLO("YOLO-Weights/ppe.pt")
+    
+    # Check if CUDA is available and set device
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print(f"Using device: {device}")
+    
+    # Move model to GPU if available
+    model.to(device)
     classNames = ['Hardhat', 'Mask', 'NO-Hardhat', 'NO-Mask', 'NO-Safety Vest', 'Person', 'Safety Cone',
                   'Safety Vest', 'machinery', 'vehicle']
 
@@ -175,7 +185,8 @@ def video_detection(path_x, email_recipient, sms_recipient):
         person_count = 0
         persons_violations = {}
 
-        results = model(img, stream=True)
+        # Run inference on GPU if available
+        results = model(img, stream=True, device=device)
         for r in results:
             boxes = r.boxes
             for box in boxes:

@@ -2,6 +2,7 @@ from ultralytics import YOLO
 import cv2
 import cvzone
 import math
+import torch
 
 def ppe_detection(file): 
     if file is None : 
@@ -10,14 +11,24 @@ def ppe_detection(file):
         cap.set(4, 720)
     else : 
         cap = cv2.VideoCapture(file) 
+    
+    # Initialize YOLO model with GPU support
     model = YOLO("best.pt")
+    
+    # Check if CUDA is available and set device
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print(f"Using device: {device}")
+    
+    # Move model to GPU if available
+    model.to(device)
 
     classNames = ['Hardhat', 'Mask', 'NO-Hardhat', 'NO-Mask', 'NO-Safety Vest', 'Person', 'Safety Cone',
                 'Safety Vest', 'machinery', 'vehicle']
     myColor = (0, 0, 255)
     while True:
         success, img = cap.read()
-        results = model(img, stream=True)
+        # Run inference on GPU if available
+        results = model(img, stream=True, device=device)
         for r in results:
             boxes = r.boxes
             for box in boxes:

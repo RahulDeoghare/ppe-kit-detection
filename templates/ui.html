@@ -7,261 +7,247 @@
     <title>Live Webcam - YOLOv8</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0;
             padding: 0;
-            background-color: #f4f4f4;
+            background-color: #f8f9fa;
             color: #333;
         }
 
-
-        header {
-            background-color: #002147;
-            padding: 10px 0;
-            color: white;
+        /* Side Navigation */
+        .sidenav {
+            height: 100vh;
+            width: 250px;
             position: fixed;
-            width: 100%;
             top: 0;
             left: 0;
+            background-color: #ffffff;
+            padding-top: 20px;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
             z-index: 1000;
+            border-right: 1px solid #e8f5e8;
         }
 
-        header .container {
-            width: 80%;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        header .logo {
+        .sidenav .brand {
             display: flex;
             align-items: center;
+            padding: 0 20px 30px 20px;
+            border-bottom: 1px solid #e8f5e8;
+            margin-bottom: 20px;
         }
 
-        header .logo img {
+        .sidenav .brand .logo {
+            width: 40px;
             height: 40px;
-            margin-right: 10px;
-        }
-
-        header .logo span {
-            font-size: 24px;
-            font-weight: bold;
-        }
-
-        header nav ul {
-            list-style: none;
-            margin: 0;
-            padding: 0;
+            background-color: #27ae60;
+            border-radius: 8px;
             display: flex;
-        }
-
-        header nav ul li {
-            margin-left: 20px;
-        }
-
-        header nav ul li a {
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
             color: white;
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .sidenav .brand .brand-text {
+            color: #2d5a2d;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .sidenav .brand .brand-subtitle {
+            color: #5a8a5a;
+            font-size: 12px;
+            margin-top: 2px;
+        }
+
+        .sidenav .nav-item {
+            display: block;
+            padding: 12px 20px;
+            color: #5a8a5a;
             text-decoration: none;
-            font-size: 16px;
-            transition: color 0.3s;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
         }
 
-        header nav ul li a:hover {
-            color: #1e90ff;
+        .sidenav .nav-item:hover {
+            background-color: #f8fdf8;
+            color: #27ae60;
+            border-left-color: #27ae60;
+            transform: translateX(5px);
+            box-shadow: 0 2px 8px rgba(39, 174, 96, 0.2);
         }
 
+        .sidenav .nav-item.active {
+            background-color: #f0f8f0;
+            color: #27ae60;
+            border-left-color: #27ae60;
+        }
 
+        .sidenav .nav-item i {
+            margin-right: 10px;
+            width: 20px;
+            text-align: center;
+        }
+
+        /* Main content area */
         .main-content {
-            margin-top: 100px;
-            padding: 20px 0;
+            margin-left: 250px;
+            padding: 30px;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: calc(100vh - 160px); 
+            min-height: 100vh;
         }
 
         .container {
             text-align: center;
-            width: 80%;
+            max-width: 1200px;
             margin: 0 auto;
         }
 
+        .page-header {
+            background-color: white;
+            padding: 20px 0;
+            margin-bottom: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
         .section-title {
-            font-size: 32px;
-            margin-bottom: 20px;
-            text-align: center;
-            color: #002147;
+            font-size: 28px;
+            margin: 0;
+            color: #2d5a2d;
+            font-weight: 600;
         }
 
         .section-description {
-            font-size: 18px;
-            margin-bottom: 20px;
-            text-align: center;
-            color: #555;
+            font-size: 16px;
+            margin: 8px 0 0 0;
+            color: #5a8a5a;
         }
 
         .content-area {
             background-color: white;
-            padding: 20px;
+            padding: 40px;
             border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            max-width: 1000px; 
-            margin: 0 auto;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .webcam-feed {
+            background-color: #f8fdf8;
+            border: 2px dashed #27ae60;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
         }
 
         .content-area img {
-            width: 80%; 
+            max-width: 100%;
             height: auto;
             border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
         }
 
-
-        footer {
-            background-color: #002147;
+        .status-indicator {
+            display: inline-block;
+            padding: 8px 16px;
+            background-color: #27ae60;
             color: white;
-            padding: 20px 0;
-            text-align: center;
-            position: absolute;
-            bottom: 0;
-            width: 100%;
-        }
-
-        footer p {
-            margin: 0;
+            border-radius: 20px;
             font-size: 14px;
+            font-weight: 500;
+            margin: 10px 0;
         }
 
-
-        #chatbot {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: 300px;
-            background-color: #002147;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            color: white;
-            font-family: Arial, sans-serif;
-            z-index: 1000;
+        .status-indicator.offline {
+            background-color: #e74c3c;
         }
 
-        #chatbot-header {
-            padding: 10px;
-            background-color: #004080;
-            border-radius: 10px 10px 0 0;
-            font-weight: bold;
-            text-align: center;
-        }
-
-        #chatbot-body {
-            max-height: 200px;
-            overflow-y: auto;
-            padding: 10px;
-        }
-
-        #chatbot-messages {
-            margin-bottom: 10px;
-        }
-
-        #chatbot-messages div {
-            margin: 5px 0;
-        }
-
-        #chatbot-options {
-            padding: 10px;
-            text-align: center;
-            border-top: 1px solid #004080;
-        }
-
-        .chatbot-option {
-            background-color: #004080;
-            color: white;
-            border: none;
-            padding: 10px;
-            margin: 5px;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-
-        .chatbot-option:hover {
-            background-color: #1e90ff;
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .sidenav {
+                width: 200px;
+            }
+            
+            .main-content {
+                margin-left: 200px;
+                padding: 20px;
+            }
+            
+            #chatbot {
+                width: 280px;
+                bottom: 10px;
+                right: 10px;
+            }
         }
     </style>
 </head>
 <body>
 
-
-    <header>
-        <div class="container">
-            <div class="logo">
-                <img src="../static/images/kongsberg.jpeg" alt="Kongsberg Logo">
-                <span>Kongsberg Maritime</span>
+    <!-- Side Navigation -->
+    <div class="sidenav">
+        <div class="brand">
+            <div class="logo">P</div>
+            <div>
+                <div class="brand-text">PPE Kit Detection</div>
+                <div class="brand-subtitle">AI Safety Monitoring</div>
             </div>
-            <nav>
-                <ul>
-                    <li><a href="/home">Home</a></li>
-                    <li><a href="/FrontPage">Video/Image</a></li>
-                    <li><a href="/webcam">Live Webcam</a></li>
-                    <li><a href="/contact">Contact</a></li>
-                </ul>
-            </nav>
         </div>
-    </header>
+        
+        <a href="/home" class="nav-item">
+            <i>🏠</i> Home
+        </a>
+        <a href="/FrontPage" class="nav-item">
+            <i>📹</i> Video/Image
+        </a>
+        <a href="/webcam" class="nav-item active">
+            <i>📷</i> Live Webcam
+        </a>
+        <a href="/contact" class="nav-item">
+            <i>📞</i> Contact
+        </a>
+    </div>
 
-
+    <!-- Main Content -->
     <div class="main-content">
         <div class="container">
-            <div class="section-title">Live Webcam Feed</div>
-            <div class="section-description">Monitor live video stream and detect objects in real-time.</div>
+            <div class="page-header">
+                <h1 class="section-title">Live Webcam Feed</h1>
+                <p class="section-description">Monitor live video stream and detect PPE violations in real-time</p>
+            </div>
+            
             <div class="content-area">
-                <img src="{{ url_for('webapp') }}" alt="Live Webcam Feed">
+                <div class="status-indicator">🔴 Live Monitoring Active</div>
+                <div class="webcam-feed">
+                    <img src="{{ url_for('webapp') }}" alt="Live Webcam Feed">
+                </div>
+                <p style="color: #7f8c8d; font-size: 14px; margin-top: 15px;">
+                    Real-time analysis powered by YOLOv8 AI technology
+                </p>
             </div>
         </div>
     </div>
 
-
-    <div id="chatbot">
-        <div id="chatbot-header">Safety Bot</div>
-        <div id="chatbot-body">
-            <div id="chatbot-messages"></div>
-        </div>
-        <div id="chatbot-options">
-            <button class="chatbot-option" data-option="NO-Hardhat">No Hardhat</button>
-            <button class="chatbot-option" data-option="NO-Mask">No Mask</button>
-            <button class="chatbot-option" data-option="NO-Safety Vest">No Safety Vest</button>
-        </div>
-    </div>
-
-
-    <footer>
-        <p>&copy; 2024 PPE Detection Project. All rights reserved.</p>
-    </footer>
-
     <script>
-        const safetyTips = {
-            "NO-Hardhat": "Not wearing a hardhat can lead to severe head injuries due to falling objects or impact.",
-            "NO-Mask": "Not wearing a mask increases the risk of exposure to airborne hazards and infectious agents.",
-            "NO-Safety Vest": "Not wearing a safety vest makes you less visible, increasing the risk of accidents in low-light conditions."
-        };
-
-        document.querySelectorAll('.chatbot-option').forEach(button => {
-            button.addEventListener('click', function() {
-                const userInput = this.dataset.option;
-                const chatbotMessages = document.getElementById('chatbot-messages');
-                chatbotMessages.innerHTML += `<div>User selected: ${userInput.replace("NO-", "No ")}</div>`;
-
-                if (safetyTips[userInput]) {
-                    chatbotMessages.innerHTML += `<div>Bot: ${safetyTips[userInput]}</div>`;
-                } else {
-                    chatbotMessages.innerHTML += `<div>Bot: I'm not sure about that. Please select a valid option.</div>`;
+        // Set active navigation item
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentPath = window.location.pathname;
+            const navItems = document.querySelectorAll('.nav-item');
+            
+            navItems.forEach(item => {
+                item.classList.remove('active');
+                if (item.getAttribute('href') === currentPath || 
+                    (currentPath.includes('webcam') && item.getAttribute('href') === '/webcam')) {
+                    item.classList.add('active');
                 }
-
-                chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
             });
         });
+
     </script>
 </body>
 </html>
-
