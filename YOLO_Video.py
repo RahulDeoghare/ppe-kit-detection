@@ -154,11 +154,27 @@ def video_detection(path_x, email_recipient, sms_recipient):
         writer = csv.writer(file)
         writer.writerow(['Timestamp', 'Person ID', 'Items Detected'])
 
-    video_capture = path_x
-    cap = cv2.VideoCapture(video_capture)
-    if not cap.isOpened():
-        print(f"Error: Could not open video {path_x}")
-        return
+    # Check if the input is an image or video
+    image_extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif')
+    is_single_image = isinstance(path_x, str) and path_x.lower().endswith(image_extensions)
+    
+    if is_single_image:
+        # For single images, process just that one image
+        img = cv2.imread(path_x)
+        if img is None:
+            print(f"Error: Could not load image {path_x}")
+            return
+        
+        # Process single image
+        yield from process_single_image(img, path_x, email_recipient, sms_recipient)
+    else:
+        # For videos or webcam
+        yield from process_video_stream(path_x, email_recipient, sms_recipient)
+
+def process_single_image(img, path_x, email_recipient, sms_recipient):
+    """Process a single image file"""
+    global last_email_time
+    global email_cooldown
     
     # Initialize YOLO model with GPU support
     model = YOLO("YOLO-Weights/ppe.pt")
@@ -172,19 +188,21 @@ def video_detection(path_x, email_recipient, sms_recipient):
     classNames = ['Hardhat', 'Mask', 'NO-Hardhat', 'NO-Mask', 'NO-Safety Vest', 'Person', 'Safety Cone',
                   'Safety Vest', 'machinery', 'vehicle']
 
-    aggregated_violations = {}
-    frame_count = 0
+    # Validate and process the image
+    if img is None or img.size == 0:
+        print("Warning: Empty image received")
+        return
 
-    while True:
-        success, img = cap.read()
-        if not success:
-            print("Error: Failed to read frame from video.")
-            break
+    # Ensure image has exactly 3 channels (RGB) for YOLO model
+    if len(img.shape) == 3 and img.shape[2] == 4:  # If image has 4 channels (RGBA)
+        img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)  # Convert to 3 channels
+    elif len(img.shape) == 2 or (len(img.shape) == 3 and img.shape[2] == 1):  # If grayscale
+        img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)  # Convert to 3 channels
 
-        frame_count += 1
-        person_count = 0
-        persons_violations = {}
+    person_count = 0
+    persons_violations = {}
 
+    try:
         # Run inference on GPU if available
         results = model(img, stream=True, device=device)
         for r in results:
@@ -215,7 +233,7 @@ def video_detection(path_x, email_recipient, sms_recipient):
                             bbox=(x1, y1, x2, y2),
                             timestamp=timestamp,
                             person_id=person_count,
-                            frame_number=frame_count
+                            frame_number=1  # Single image, so frame 1
                         )
                         
                         cv2.rectangle(img, (x1, y1), (x2, y2), (0, 0, 255), 3)
@@ -224,32 +242,167 @@ def video_detection(path_x, email_recipient, sms_recipient):
                         cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 3)
                         cv2.putText(img, label, (x1, y1 - 2), 0, 1, [255, 255, 255], thickness=1, lineType=cv2.LINE_AA)
 
+        # Handle violations and alerts for single image
         if persons_violations:
-
             aggregated_violations = aggregate_violations(persons_violations)
+            
+            for person_id, detected_items in aggregated_violations.items():
+                log_detection_to_csv(person_id, detected_items)
 
+            if 'email_cooldown' not in globals():
+                email_cooldown = 60 
 
-        for person_id, detected_items in aggregated_violations.items():
-            log_detection_to_csv(person_id, detected_items)
+            if aggregated_violations and current_time - last_email_time > email_cooldown:
+                email_cooldown = adjust_cooldown([v for sublist in aggregated_violations.values() for v in sublist])
+                subject = f"PPE Violation Detected - {len(aggregated_violations)} Person(s)"
+                body_lines = []
+                for person_id, violations in aggregated_violations.items():
+                    violation_messages = [f"{v}: {violation_tips[v]}" for v in violations]
+                    body_lines.append(f"Person {person_id} not detected items:\n" + "\n".join(violation_messages))
+                body = "\n\n".join(body_lines)
+                print(f"Sending email and SMS: {subject} | {body}")
+                send_email_alert(subject, body, email_recipient)
+                send_sms_alert(body, sms_recipient)
+                last_email_time = current_time
 
-        if 'email_cooldown' not in globals():
-            email_cooldown = 60 
+        # For single image, yield the processed image continuously to maintain the stream
+        for _ in range(60):  # Show the image for approximately 60 frames
+            yield img
+            
+    except Exception as e:
+        print(f"Error during image processing: {e}")
+        return
 
-        if aggregated_violations and current_time - last_email_time > email_cooldown:
-            email_cooldown = adjust_cooldown([v for sublist in aggregated_violations.values() for v in sublist])
-            subject = f"PPE Violation Detected - {len(aggregated_violations)} Person(s)"
-            body_lines = []
-            for person_id, violations in aggregated_violations.items():
-                violation_messages = [f"{v}: {violation_tips[v]}" for v in violations]
-                body_lines.append(f"Person {person_id} not detected items:\n" + "\n".join(violation_messages))
-            body = "\n\n".join(body_lines)
-            print(f"Sending email and SMS: {subject} | {body}")
-            send_email_alert(subject, body, email_recipient)
-            send_sms_alert(body, sms_recipient)
-            last_email_time = current_time
+def process_video_stream(path_x, email_recipient, sms_recipient):
+    """Process video file or webcam stream"""
+    global last_email_time
+    global email_cooldown
 
-        yield img
+    video_capture = path_x
+    cap = cv2.VideoCapture(video_capture)
+    
+    # Set video capture properties for better compatibility
+    if isinstance(video_capture, str):  # If it's a file path
+        # Try different backends for better codec support
+        if not cap.isOpened():
+            cap = cv2.VideoCapture(video_capture, cv2.CAP_FFMPEG)
+        if not cap.isOpened():
+            cap = cv2.VideoCapture(video_capture, cv2.CAP_DSHOW)
+            
+    if not cap.isOpened():
+        print(f"Error: Could not open video {path_x}")
+        return
+    
+    # Get video properties for debugging
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    print(f"Video properties: {width}x{height} @ {fps} FPS")
+    
+    # Initialize YOLO model with GPU support
+    model = YOLO("YOLO-Weights/ppe.pt")
+    
+    # Check if CUDA is available and set device
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print(f"Using device: {device}")
+    
+    # Move model to GPU if available
+    model.to(device)
+    classNames = ['Hardhat', 'Mask', 'NO-Hardhat', 'NO-Mask', 'NO-Safety Vest', 'Person', 'Safety Cone',
+                  'Safety Vest', 'machinery', 'vehicle']
 
-    cap.release()
-    cv2.destroyAllWindows()
+    aggregated_violations = {}
+    frame_count = 0
+
+    try:
+        while True:
+            success, img = cap.read()
+            if not success:
+                print("Error: Failed to read frame from video.")
+                break
+
+            # Validate frame
+            if img is None or img.size == 0:
+                print("Warning: Empty frame received, skipping...")
+                continue
+
+            frame_count += 1
+            person_count = 0
+            persons_violations = {}
+
+            # Ensure image has exactly 3 channels (RGB) for YOLO model
+            if len(img.shape) == 3 and img.shape[2] == 4:  # If image has 4 channels (RGBA)
+                img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)  # Convert to 3 channels
+            elif len(img.shape) == 2 or (len(img.shape) == 3 and img.shape[2] == 1):  # If grayscale
+                img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)  # Convert to 3 channels
+
+            try:
+                # Run inference on GPU if available
+                results = model(img, stream=True, device=device)
+            except Exception as e:
+                print(f"Error during inference: {e}")
+                continue
+            for r in results:
+                boxes = r.boxes
+                for box in boxes:
+                    x1, y1, x2, y2 = box.xyxy[0]
+                    x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+                    conf = math.ceil((box.conf[0] * 100)) / 100
+                    cls = int(box.cls[0])
+                    class_name = classNames[cls]
+                    label = f'{class_name}{conf}'
+
+                    current_time = time.time()
+
+                    if conf > 0.5:
+                        if class_name == 'Person':
+                            person_count += 1
+                            persons_violations[person_count] = []
+                        elif class_name in ['NO-Hardhat', 'NO-Mask', 'NO-Safety Vest']:
+                            if person_count in persons_violations:
+                                persons_violations[person_count].append(class_name)
+                            
+                            # Save violation to JSON
+                            timestamp = datetime.now()
+                            save_violation_to_json(
+                                violation_type=class_name,
+                                confidence=conf,
+                                bbox=(x1, y1, x2, y2),
+                                timestamp=timestamp,
+                                person_id=person_count,
+                                frame_number=frame_count
+                            )
+                            
+                            cv2.rectangle(img, (x1, y1), (x2, y2), (0, 0, 255), 3)
+                            cv2.putText(img, label, (x1, y1 - 2), 0, 1, [255, 255, 255], thickness=1, lineType=cv2.LINE_AA)
+                        else:
+                            cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 3)
+                            cv2.putText(img, label, (x1, y1 - 2), 0, 1, [255, 255, 255], thickness=1, lineType=cv2.LINE_AA)
+
+            if persons_violations:
+                aggregated_violations = aggregate_violations(persons_violations)
+
+            for person_id, detected_items in aggregated_violations.items():
+                log_detection_to_csv(person_id, detected_items)
+
+            if 'email_cooldown' not in globals():
+                email_cooldown = 60 
+
+            if aggregated_violations and current_time - last_email_time > email_cooldown:
+                email_cooldown = adjust_cooldown([v for sublist in aggregated_violations.values() for v in sublist])
+                subject = f"PPE Violation Detected - {len(aggregated_violations)} Person(s)"
+                body_lines = []
+                for person_id, violations in aggregated_violations.items():
+                    violation_messages = [f"{v}: {violation_tips[v]}" for v in violations]
+                    body_lines.append(f"Person {person_id} not detected items:\n" + "\n".join(violation_messages))
+                body = "\n\n".join(body_lines)
+                print(f"Sending email and SMS: {subject} | {body}")
+                send_email_alert(subject, body, email_recipient)
+                send_sms_alert(body, sms_recipient)
+                last_email_time = current_time
+
+            yield img
+    finally:
+        cap.release()
+        cv2.destroyAllWindows()
 

@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Live Video Feed - YOLOv8</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+
+        /* Side Navigation */
+        .sidenav {
+            height: 100vh;
+            width: 250px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            background-color: #ffffff;
+            padding-top: 20px;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            z-index: 1000;
+            border-right: 1px solid #e8f5e8;
+        }
+
+        .sidenav .brand {
+            display: flex;
+            align-items: center;
+            padding: 0 20px 30px 20px;
+            border-bottom: 1px solid #e8f5e8;
+            margin-bottom: 20px;
+        }
+
+        .sidenav .brand .logo {
+            width: 40px;
+            height: 40px;
+            background-color: #27ae60;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            color: white;
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .sidenav .brand .brand-text {
+            color: #2d5a2d;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .sidenav .brand .brand-subtitle {
+            color: #5a8a5a;
+            font-size: 12px;
+            margin-top: 2px;
+        }
+
+        .sidenav .nav-item {
+            display: block;
+            padding: 12px 20px;
+            color: #5a8a5a;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .sidenav .nav-item:hover {
+            background-color: #f8fdf8;
+            color: #27ae60;
+            border-left-color: #27ae60;
+            transform: translateX(5px);
+            box-shadow: 0 2px 8px rgba(39, 174, 96, 0.2);
+        }
+
+        .sidenav .nav-item.active {
+            background-color: #f0f8f0;
+            color: #27ae60;
+            border-left-color: #27ae60;
+        }
+
+        .sidenav .nav-item i {
+            margin-right: 10px;
+            width: 20px;
+            text-align: center;
+        }
+
+        /* Main content area */
+        .main-content {
+            margin-left: 250px;
+            padding: 30px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .page-header {
+            background-color: white;
+            padding: 20px 0;
+            margin-bottom: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .section-title {
+            font-size: 28px;
+            margin: 0;
+            color: #2d5a2d;
+            font-weight: 600;
+        }
+
+        .section-description {
+            font-size: 16px;
+            margin: 8px 0 0 0;
+            color: #5a8a5a;
+        }
+
+        .options-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .option-card {
+            background-color: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            text-align: center;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            border: 2px solid transparent;
+        }
+
+        .option-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(39, 174, 96, 0.2);
+            border-color: #27ae60;
+        }
+
+        .option-card.active {
+            border-color: #27ae60;
+            background-color: #f8fdf8;
+        }
+
+        .option-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+            display: block;
+        }
+
+        .option-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #2d5a2d;
+            margin-bottom: 10px;
+        }
+
+        .option-description {
+            color: #5a8a5a;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background-color 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn:hover {
+            background-color: #219a52;
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+        }
+
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+
+        .rtsp-form {
+            background-color: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            margin-top: 20px;
+            display: none;
+        }
+
+        .rtsp-form.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .form-label {
+            display: block;
+            font-weight: 500;
+            color: #2d5a2d;
+            margin-bottom: 8px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e8f5e8;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #27ae60;
+        }
+
+        .video-container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            margin-top: 20px;
+            text-align: center;
+            display: none;
+        }
+
+        .video-container.active {
+            display: block;
+        }
+
+        .video-feed {
+            background-color: #f8fdf8;
+            border: 2px dashed #27ae60;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .video-feed img {
+            max-width: 100%;
+            border-radius: 8px;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            padding: 8px 16px;
+            background-color: #dc3545;
+            color: white;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 20px;
+        }
+
+        .status-indicator.live {
+            background-color: #28a745;
+        }
+
+        .alert {
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .alert-warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+
+        @media (max-width: 768px) {
+            .options-container {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .main-content {
+                margin-left: 0;
+                padding: 20px;
+            }
+            
+            .sidenav {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Side Navigation -->
+    <div class="sidenav">
+        <div class="brand">
+            <div class="logo">P</div>
+            <div>
+                <div class="brand-text">PPE Monitor</div>
+                <div class="brand-subtitle">AI Detection</div>
+            </div>
+        </div>
+        
+        <a href="/home" class="nav-item">
+            <i>🏠</i> Home
+        </a>
+        <a href="/FrontPage" class="nav-item">
+            <i>📹</i> Video/Image
+        </a>
+        <a href="/live_feed" class="nav-item active">
+            <i>📷</i> Live Feed
+        </a>
+        <a href="/contact" class="nav-item">
+            <i>📞</i> Contact
+        </a>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="container">
+            <div class="page-header">
+                <h1 class="section-title">Live Video Feed</h1>
+                <p class="section-description">Choose your video source for real-time PPE violation detection</p>
+            </div>
+            
+            <!-- Video Source Options -->
+            <div class="options-container">
+                <div class="option-card" id="webcam-option">
+                    <span class="option-icon">📷</span>
+                    <div class="option-title">Webcam</div>
+                    <div class="option-description">Use your computer's built-in or USB camera for live monitoring</div>
+                    <button class="btn" onclick="selectWebcam()">Start Webcam</button>
+                </div>
+                
+                <div class="option-card" id="rtsp-option">
+                    <span class="option-icon">📡</span>
+                    <div class="option-title">RTSP Stream</div>
+                    <div class="option-description">Connect to an IP camera or network video stream using RTSP protocol</div>
+                    <button class="btn" onclick="selectRTSP()">Configure RTSP</button>
+                </div>
+            </div>
+
+            <!-- RTSP Configuration Form -->
+            <div class="rtsp-form" id="rtsp-form">
+                <h3 style="color: #2d5a2d; margin-bottom: 20px;">RTSP Stream Configuration</h3>
+                <div class="alert alert-warning">
+                    <strong>Note:</strong> Make sure your RTSP stream is accessible and the URL format is correct (e.g., rtsp://username:password@ip:port/path)
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="rtsp-url">RTSP URL:</label>
+                    <input type="text" id="rtsp-url" class="form-input" 
+                           placeholder="rtsp://username:password@192.168.1.100:554/stream1"
+                           value="">
+                </div>
+                
+                <div style="text-align: center;">
+                    <button class="btn" onclick="startRTSP()">Start RTSP Stream</button>
+                    <button class="btn btn-secondary" onclick="cancelRTSP()" style="margin-left: 10px;">Cancel</button>
+                </div>
+            </div>
+
+            <!-- Video Display Container -->
+            <div class="video-container" id="video-container">
+                <div class="status-indicator" id="status-indicator">🔴 Connecting...</div>
+                <div class="video-feed">
+                    <img id="video-stream" src="" alt="Live Video Feed" style="display: none;">
+                    <div id="loading-message" style="padding: 40px; color: #5a8a5a;">
+                        <div style="font-size: 24px; margin-bottom: 10px;">📡</div>
+                        <div>Initializing video stream...</div>
+                    </div>
+                </div>
+                <p style="color: #7f8c8d; font-size: 14px; margin-top: 15px;">
+                    Real-time analysis powered by YOLOv8 AI technology
+                </p>
+                <button class="btn btn-secondary" onclick="stopStream()">Stop Stream</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentStream = null;
+
+        function selectWebcam() {
+            document.getElementById('webcam-option').classList.add('active');
+            document.getElementById('rtsp-option').classList.remove('active');
+            document.getElementById('rtsp-form').classList.remove('active');
+            
+            // Show video container
+            document.getElementById('video-container').classList.add('active');
+            document.getElementById('status-indicator').textContent = '🔴 Live Monitoring Active';
+            document.getElementById('status-indicator').classList.add('live');
+            
+            // Start webcam stream
+            currentStream = 'webcam';
+            const videoElement = document.getElementById('video-stream');
+            videoElement.src = '/webapp';
+            videoElement.style.display = 'block';
+            document.getElementById('loading-message').style.display = 'none';
+        }
+
+        function selectRTSP() {
+            document.getElementById('rtsp-option').classList.add('active');
+            document.getElementById('webcam-option').classList.remove('active');
+            document.getElementById('rtsp-form').classList.add('active');
+            document.getElementById('video-container').classList.remove('active');
+        }
+
+        function startRTSP() {
+            const rtspUrl = document.getElementById('rtsp-url').value.trim();
+            
+            if (!rtspUrl) {
+                alert('Please enter a valid RTSP URL');
+                return;
+            }
+
+            // Validate RTSP URL format
+            if (!rtspUrl.toLowerCase().startsWith('rtsp://')) {
+                alert('RTSP URL must start with rtsp://');
+                return;
+            }
+
+            // Hide form and show video container
+            document.getElementById('rtsp-form').classList.remove('active');
+            document.getElementById('video-container').classList.add('active');
+            document.getElementById('status-indicator').textContent = '🔴 Connecting to RTSP Stream...';
+            document.getElementById('status-indicator').classList.remove('live');
+            
+            // Start RTSP stream
+            currentStream = 'rtsp';
+            const videoElement = document.getElementById('video-stream');
+            videoElement.style.display = 'none';
+            document.getElementById('loading-message').style.display = 'block';
+            document.getElementById('loading-message').innerHTML = '<div style="font-size: 24px; margin-bottom: 10px;">📡</div><div>Connecting to RTSP stream...</div>';
+            
+            // Encode the RTSP URL for the request
+            const encodedUrl = encodeURIComponent(rtspUrl);
+            
+            // Set up the stream
+            setTimeout(() => {
+                videoElement.src = `/rtsp_stream?url=${encodedUrl}`;
+                videoElement.onload = () => {
+                    document.getElementById('status-indicator').textContent = '🔴 RTSP Stream Active';
+                    document.getElementById('status-indicator').classList.add('live');
+                    videoElement.style.display = 'block';
+                    document.getElementById('loading-message').style.display = 'none';
+                };
+                videoElement.onerror = () => {
+                    document.getElementById('loading-message').innerHTML = '<div style="color: #dc3545;">❌ Failed to connect to RTSP stream. Please check the URL and try again.</div>';
+                    document.getElementById('status-indicator').textContent = '❌ Connection Failed';
+                    document.getElementById('status-indicator').classList.remove('live');
+                };
+            }, 1000);
+        }
+
+        function cancelRTSP() {
+            document.getElementById('rtsp-form').classList.remove('active');
+            document.getElementById('rtsp-option').classList.remove('active');
+            document.getElementById('rtsp-url').value = '';
+        }
+
+        function stopStream() {
+            currentStream = null;
+            document.getElementById('video-container').classList.remove('active');
+            document.getElementById('webcam-option').classList.remove('active');
+            document.getElementById('rtsp-option').classList.remove('active');
+            document.getElementById('video-stream').src = '';
+            document.getElementById('video-stream').style.display = 'none';
+            document.getElementById('loading-message').style.display = 'block';
+            document.getElementById('loading-message').innerHTML = '<div style="font-size: 24px; margin-bottom: 10px;">📡</div><div>Initializing video stream...</div>';
+        }
+
+        // Set active navigation item
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentPath = window.location.pathname;
+            const navItems = document.querySelectorAll('.nav-item');
+            
+            navItems.forEach(item => {
+                item.classList.remove('active');
+                if (item.getAttribute('href') === currentPath || 
+                    (currentPath.includes('live_feed') && item.getAttribute('href') === '/live_feed')) {
+                    item.classList.add('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
