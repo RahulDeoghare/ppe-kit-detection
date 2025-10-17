@@ -18,9 +18,9 @@ class UploadFileForm(FlaskForm):
     file = FileField("File", validators=[InputRequired()])
     submit = SubmitField("Run")
 
-def generate_frames(path_x='', email_recipient='3021130@extc.fcrit.ac.in', sms_recipient='+918452992560'):
+def generate_frames(path_x=''):
     try:
-        yolo_output = video_detection(path_x, email_recipient, sms_recipient)
+        yolo_output = video_detection(path_x)
         for detection_ in yolo_output:
             try:
                 ref, buffer = cv2.imencode('.jpg', detection_)
@@ -69,9 +69,7 @@ def front():
 
 @app.route('/video')
 def video():
-    email_recipient = "recipient@example.com"
-    sms_recipient = "+918452992560"
-    return Response(generate_frames(path_x=session.get('video_path', None), email_recipient=email_recipient, sms_recipient=sms_recipient), 
+    return Response(generate_frames(path_x=session.get('video_path', None)), 
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/webapp')
@@ -82,9 +80,7 @@ def webapp():
 def rtsp_stream():
     rtsp_url = request.args.get('url', '')
     if rtsp_url:
-        email_recipient = "recipient@example.com"
-        sms_recipient = "+918452992560"
-        return Response(generate_frames(path_x=rtsp_url, email_recipient=email_recipient, sms_recipient=sms_recipient), 
+        return Response(generate_frames(path_x=rtsp_url), 
                         mimetype='multipart/x-mixed-replace; boundary=frame')
     else:
         return "No RTSP URL provided", 400
