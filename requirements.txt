@@ -15,6 +15,13 @@ Flask-WTF>=1.1.0
 WTForms>=3.0.0
 Werkzeug>=2.2.0
 
+# Database Dependencies
+psycopg2-binary>=2.9.0
+SQLAlchemy>=1.4.0
+
+# Environment Variables
+python-dotenv>=0.19.0
+
 # Communication and Alerts
 twilio>=8.0.0
 

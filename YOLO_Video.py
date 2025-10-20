@@ -9,6 +9,7 @@ import json
 import os
 from datetime import datetime
 import torch
+from database_manager import get_db_manager, wait_for_db
 
 
 logging.basicConfig(filename='alert_timing.log', level=logging.INFO, format='%(asctime)s - %(message)s')
@@ -87,6 +88,30 @@ def log_detection_to_csv(person_id, detected_items):
         writer.writerow([timestamp, person_id, items_str])
 
 def video_detection(path_x):
+    # Initialize database
+    if not wait_for_db():
+        print("Warning: Database not available, falling back to CSV logging only")
+        db_manager = None
+    else:
+        db_manager = get_db_manager()
+    
+    # Create detection session in database
+    session_id = None
+    if db_manager:
+        try:
+            source_type = "webcam" if path_x == 0 else "video_file" if isinstance(path_x, str) else "unknown"
+            source_path = str(path_x) if path_x != 0 else None
+            session_id = db_manager.create_detection_session(
+                session_name=f"Detection Session {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                source_type=source_type,
+                source_path=source_path
+            )
+            print(f"Created database session: {session_id}")
+        except Exception as e:
+            print(f"Failed to create database session: {e}")
+            db_manager = None
+    
+    # Keep CSV logging for backward compatibility
     with open('detection_log.csv', mode='w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(['Timestamp', 'Person ID', 'Items Detected'])
@@ -95,20 +120,29 @@ def video_detection(path_x):
     image_extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif')
     is_single_image = isinstance(path_x, str) and path_x.lower().endswith(image_extensions)
     
-    if is_single_image:
-        # For single images, process just that one image
-        img = cv2.imread(path_x)
-        if img is None:
-            print(f"Error: Could not load image {path_x}")
-            return
-        
-        # Process single image
-        yield from process_single_image(img, path_x)
-    else:
-        # For videos or webcam
-        yield from process_video_stream(path_x)
+    try:
+        if is_single_image:
+            # For single images, process just that one image
+            img = cv2.imread(path_x)
+            if img is None:
+                print(f"Error: Could not load image {path_x}")
+                return
+            
+            # Process single image
+            yield from process_single_image(img, path_x, session_id, db_manager)
+        else:
+            # For videos or webcam
+            yield from process_video_stream(path_x, session_id, db_manager)
+    finally:
+        # End database session
+        if db_manager and session_id:
+            try:
+                db_manager.end_detection_session(session_id)
+                print(f"Ended database session: {session_id}")
+            except Exception as e:
+                print(f"Failed to end database session: {e}")
 
-def process_single_image(img, path_x):
+def process_single_image(img, path_x, session_id=None, db_manager=None):
     """Process a single image file"""
     
     # Initialize YOLO model with GPU support
@@ -136,6 +170,7 @@ def process_single_image(img, path_x):
 
     person_count = 0
     persons_violations = {}
+    person_detections_db = {}  # Store database IDs for person detections
 
     try:
         # Run inference on GPU if available
@@ -154,11 +189,26 @@ def process_single_image(img, path_x):
                     if class_name == 'Person':
                         person_count += 1
                         persons_violations[person_count] = []
+                        
+                        # Save person detection to database
+                        if db_manager and session_id:
+                            try:
+                                person_detection_id = db_manager.save_person_detection(
+                                    session_id=session_id,
+                                    person_id=person_count,
+                                    frame_number=1,  # Single image, so frame 1
+                                    bbox=(x1, y1, x2, y2),
+                                    confidence=conf
+                                )
+                                person_detections_db[person_count] = person_detection_id
+                            except Exception as e:
+                                print(f"Failed to save person detection to database: {e}")
+                    
                     elif class_name in ['NO-Hardhat', 'NO-Mask', 'NO-Safety Vest']:
                         if person_count in persons_violations:
                             persons_violations[person_count].append(class_name)
                         
-                        # Save violation to JSON
+                        # Save violation to JSON (keep for backward compatibility)
                         timestamp = datetime.now()
                         save_violation_to_json(
                             violation_type=class_name,
@@ -169,13 +219,41 @@ def process_single_image(img, path_x):
                             frame_number=1  # Single image, so frame 1
                         )
                         
+                        # Save violation to database
+                        if db_manager and session_id and person_count in person_detections_db:
+                            try:
+                                db_manager.save_violation(
+                                    session_id=session_id,
+                                    person_detection_id=person_detections_db[person_count],
+                                    violation_type=class_name,
+                                    frame_number=1,
+                                    confidence=conf,
+                                    bbox=(x1, y1, x2, y2),
+                                    severity="high" if conf > 0.8 else "medium"
+                                )
+                            except Exception as e:
+                                print(f"Failed to save violation to database: {e}")
+                        
                         cv2.rectangle(img, (x1, y1), (x2, y2), (0, 0, 255), 3)
                         cv2.putText(img, label, (x1, y1 - 2), 0, 1, [255, 255, 255], thickness=1, lineType=cv2.LINE_AA)
                     else:
+                        # Save non-violation objects to database
+                        if db_manager and session_id:
+                            try:
+                                db_manager.save_object_detection(
+                                    session_id=session_id,
+                                    frame_number=1,
+                                    class_name=class_name,
+                                    confidence=conf,
+                                    bbox=(x1, y1, x2, y2)
+                                )
+                            except Exception as e:
+                                print(f"Failed to save object detection to database: {e}")
+                        
                         cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 3)
                         cv2.putText(img, label, (x1, y1 - 2), 0, 1, [255, 255, 255], thickness=1, lineType=cv2.LINE_AA)
 
-        # Handle violations for single image
+        # Handle violations for single image (CSV logging)
         if persons_violations:
             aggregated_violations = aggregate_violations(persons_violations)
             
@@ -190,7 +268,7 @@ def process_single_image(img, path_x):
         print(f"Error during image processing: {e}")
         return
 
-def process_video_stream(path_x):
+def process_video_stream(path_x, session_id=None, db_manager=None):
     """Process video file or webcam stream"""
 
     video_capture = path_x
@@ -244,6 +322,7 @@ def process_video_stream(path_x):
             frame_count += 1
             person_count = 0
             persons_violations = {}
+            person_detections_db = {}  # Store database IDs for person detections
 
             # Ensure image has exactly 3 channels (RGB) for YOLO model
             if len(img.shape) == 3 and img.shape[2] == 4:  # If image has 4 channels (RGBA)
@@ -257,6 +336,7 @@ def process_video_stream(path_x):
             except Exception as e:
                 print(f"Error during inference: {e}")
                 continue
+            
             for r in results:
                 boxes = r.boxes
                 for box in boxes:
@@ -271,11 +351,26 @@ def process_video_stream(path_x):
                         if class_name == 'Person':
                             person_count += 1
                             persons_violations[person_count] = []
+                            
+                            # Save person detection to database
+                            if db_manager and session_id:
+                                try:
+                                    person_detection_id = db_manager.save_person_detection(
+                                        session_id=session_id,
+                                        person_id=person_count,
+                                        frame_number=frame_count,
+                                        bbox=(x1, y1, x2, y2),
+                                        confidence=conf
+                                    )
+                                    person_detections_db[person_count] = person_detection_id
+                                except Exception as e:
+                                    print(f"Failed to save person detection to database: {e}")
+                        
                         elif class_name in ['NO-Hardhat', 'NO-Mask', 'NO-Safety Vest']:
                             if person_count in persons_violations:
                                 persons_violations[person_count].append(class_name)
                             
-                            # Save violation to JSON
+                            # Save violation to JSON (keep for backward compatibility)
                             timestamp = datetime.now()
                             save_violation_to_json(
                                 violation_type=class_name,
@@ -286,15 +381,44 @@ def process_video_stream(path_x):
                                 frame_number=frame_count
                             )
                             
+                            # Save violation to database
+                            if db_manager and session_id and person_count in person_detections_db:
+                                try:
+                                    db_manager.save_violation(
+                                        session_id=session_id,
+                                        person_detection_id=person_detections_db[person_count],
+                                        violation_type=class_name,
+                                        frame_number=frame_count,
+                                        confidence=conf,
+                                        bbox=(x1, y1, x2, y2),
+                                        severity="high" if conf > 0.8 else "medium"
+                                    )
+                                except Exception as e:
+                                    print(f"Failed to save violation to database: {e}")
+                            
                             cv2.rectangle(img, (x1, y1), (x2, y2), (0, 0, 255), 3)
                             cv2.putText(img, label, (x1, y1 - 2), 0, 1, [255, 255, 255], thickness=1, lineType=cv2.LINE_AA)
                         else:
+                            # Save non-violation objects to database
+                            if db_manager and session_id:
+                                try:
+                                    db_manager.save_object_detection(
+                                        session_id=session_id,
+                                        frame_number=frame_count,
+                                        class_name=class_name,
+                                        confidence=conf,
+                                        bbox=(x1, y1, x2, y2)
+                                    )
+                                except Exception as e:
+                                    print(f"Failed to save object detection to database: {e}")
+                            
                             cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 3)
                             cv2.putText(img, label, (x1, y1 - 2), 0, 1, [255, 255, 255], thickness=1, lineType=cv2.LINE_AA)
 
             if persons_violations:
                 aggregated_violations = aggregate_violations(persons_violations)
 
+            # CSV logging for backward compatibility
             for person_id, detected_items in aggregated_violations.items():
                 log_detection_to_csv(person_id, detected_items)
 
