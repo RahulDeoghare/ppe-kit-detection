@@ -182,9 +182,8 @@ class DatabaseManager:
             with self.get_connection() as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cursor:
                     # Get total count
-                    cursor.execute("SELECT COUNT(*) as total FROM ppe_violations")
-                    count_result = cursor.fetchone()
-                    total_count = count_result['total'] if count_result else 0
+                    cursor.execute("SELECT COUNT(*) FROM ppe_violations")
+                    total_count = cursor.fetchone()[0]
                     
                     # Get paginated results
                     offset = (page - 1) * per_page
@@ -217,8 +216,7 @@ class DatabaseManager:
                     return violations, total_count
         except Exception as e:
             logger.error(f"Failed to get paginated violations: {e}")
-            # Return empty results instead of raising
-            return [], 0
+            raise
 
     def get_all_violations(self, limit: int = 1000) -> List[Dict]:
         """Get ALL violations from the database"""
