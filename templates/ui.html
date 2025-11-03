@@ -205,8 +205,8 @@
         <a href="/FrontPage" class="nav-item">
             <i>📹</i> Video/Image
         </a>
-        <a href="/live_feed" class="nav-item">
-            <i>📷</i> Live Feed
+        <a href="/webcam" class="nav-item">
+            <i>�</i> RTSP Feed
         </a>
         <a href="/violations" class="nav-item">
             <i>⚠️</i> Violations
@@ -220,17 +220,35 @@
     <div class="main-content">
         <div class="container">
             <div class="page-header">
-                <h1 class="section-title">Live Webcam Feed</h1>
-                <p class="section-description">Monitor live video stream and detect PPE violations in real-time</p>
+                <h1 class="section-title">Multi-Camera RTSP Feed</h1>
+                <p class="section-description">Monitor live video streams and detect PPE violations in real-time</p>
             </div>
             
             <div class="content-area">
-                <div class="status-indicator">🔴 Live Monitoring Active</div>
+                <div class="status-indicator">⚪ Ready to Start Multi-Camera Monitoring</div>
                 <div class="webcam-feed">
-                    <img src="{{ url_for('webapp') }}" alt="Live Webcam Feed">
+                    <p style="color: #7f8c8d; font-size: 16px; margin-bottom: 20px;">
+                        Click the button below to start monitoring all configured RTSP camera feeds simultaneously
+                    </p>
+                    <form method="post" action="/webcam" style="display: inline;">
+                        <button type="submit" style="
+                            background-color: #27ae60;
+                            color: white;
+                            border: none;
+                            padding: 15px 30px;
+                            font-size: 16px;
+                            font-weight: 600;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            transition: all 0.3s ease;
+                            box-shadow: 0 4px 8px rgba(39, 174, 96, 0.3);
+                        " onmouseover="this.style.backgroundColor='#229954'" onmouseout="this.style.backgroundColor='#27ae60'">
+                            🚀 Start Multi-Camera Feed
+                        </button>
+                    </form>
                 </div>
                 <p style="color: #7f8c8d; font-size: 14px; margin-top: 15px;">
-                    Real-time analysis powered by YOLOv8 AI technology
+                    Real-time PPE violation detection powered by YOLOv8 AI technology across multiple cameras
                 </p>
             </div>
         </div>

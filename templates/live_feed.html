@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>Live Video Feed - YOLOv8</title>
+    <title>Live RTSP Feed - YOLOv8</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -259,11 +259,38 @@
             border-radius: 12px;
             padding: 20px;
             margin: 20px 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
         }
 
-        .video-feed img {
+        .camera-stream {
+            flex: 1;
+            min-width: 300px;
+            max-width: 400px;
+            position: relative;
+        }
+
+        .camera-label {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: rgba(39, 174, 96, 0.9);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            z-index: 10;
+        }
+
+        .camera-stream img {
             max-width: 100%;
+            height: auto;
             border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            border: 2px solid #27ae60;
         }
 
         .status-indicator {
@@ -327,8 +354,8 @@
         <a href="/FrontPage" class="nav-item">
             <i>📹</i> Video/Image
         </a>
-        <a href="/live_feed" class="nav-item active">
-            <i>📷</i> Live Feed
+        <a href="/webcam" class="nav-item active">
+            <i>�</i> RTSP Feed
         </a>
         <a href="/violations" class="nav-item">
             <i>⚠️</i> Violations
@@ -342,148 +369,35 @@
     <div class="main-content">
         <div class="container">
             <div class="page-header">
-                <h1 class="section-title">Live Video Feed</h1>
-                <p class="section-description">Choose your video source for real-time PPE violation detection</p>
+                <h1 class="section-title">Live RTSP Multi-Camera Feed</h1>
+                <p class="section-description">Real-time PPE violation detection from multiple RTSP streams</p>
+                <div id="camera-status" style="margin-top: 10px; font-size: 14px; color: #666;">
+                    🔄 Loading camera status...
+                </div>
             </div>
             
-            <!-- Video Source Options -->
-            <div class="options-container">
-                <div class="option-card" id="webcam-option">
-                    <span class="option-icon">📷</span>
-                    <div class="option-title">Webcam</div>
-                    <div class="option-description">Use your computer's built-in or USB camera for live monitoring</div>
-                    <button class="btn" onclick="selectWebcam()">Start Webcam</button>
+            <!-- Multi-Camera Video Display Container -->
+            <div class="video-container active">
+                <div class="status-indicator live">🔴 Multi-Camera RTSP Monitoring Active</div>
+                <div class="video-feed" id="multi-stream-feed">
+                    {% for rtsp_url in rtsp_urls %}
+                    <div class="camera-stream">
+                        <div class="camera-label">Camera {{ loop.index }}</div>
+                        <img src="/rtsp_stream?camera_id={{ loop.index }}" alt="Camera {{ loop.index }} RTSP Feed">
+                    </div>
+                    {% endfor %}
                 </div>
-                
-                <div class="option-card" id="rtsp-option">
-                    <span class="option-icon">📡</span>
-                    <div class="option-title">RTSP Stream</div>
-                    <div class="option-description">Connect to an IP camera or network video stream using RTSP protocol</div>
-                    <button class="btn" onclick="selectRTSP()">Configure RTSP</button>
-                </div>
-            </div>
-
-            <!-- RTSP Configuration Form -->
-            <div class="rtsp-form" id="rtsp-form">
-                <h3 style="color: #2d5a2d; margin-bottom: 20px;">RTSP Stream Configuration (Up to 3 Streams)</h3>
-                <div class="alert alert-warning">
-                    <strong>Note:</strong> Enter up to 3 RTSP URLs. Leave unused fields blank.
-                </div>
-                <form id="multi-rtsp-form">
-                    <div class="form-group">
-                        <label class="form-label" for="rtsp-url1">RTSP URL 1:</label>
-                        <input type="text" id="rtsp-url1" class="form-input" placeholder="rtsp://..." value="">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" for="rtsp-url2">RTSP URL 2:</label>
-                        <input type="text" id="rtsp-url2" class="form-input" placeholder="(optional)" value="">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" for="rtsp-url3">RTSP URL 3:</label>
-                        <input type="text" id="rtsp-url3" class="form-input" placeholder="(optional)" value="">
-                    </div>
-                    <div style="text-align: center;">
-                        <button type="button" class="btn" onclick="startMultiRTSP()">Start RTSP Streams</button>
-                        <button type="button" class="btn btn-secondary" onclick="cancelRTSP()" style="margin-left: 10px;">Cancel</button>
-                    </div>
-                </form>
-            </div>
-
-            <!-- Multi-Stream Video Display Container -->
-            <div class="video-container" id="video-container" style="display:none;">
-                <div class="status-indicator" id="status-indicator">🔴 Connecting...</div>
-                <div class="video-feed" id="multi-stream-feed" style="display:flex; gap:20px; flex-wrap:wrap; justify-content:center;"></div>
                 <p style="color: #7f8c8d; font-size: 14px; margin-top: 15px;">
-                    Real-time analysis powered by YOLOv8 AI technology
+                    Real-time analysis powered by YOLOv8 AI technology across {{ rtsp_urls | length }} cameras
                 </p>
-                <button class="btn btn-secondary" onclick="stopStream()">Stop Streams</button>
+                <div style="text-align: center; margin-top: 20px;">
+                    <a href="/webcam" class="btn btn-secondary">Stop All Feeds</a>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
-        let currentStream = null;
-
-        function selectWebcam() {
-            document.getElementById('webcam-option').classList.add('active');
-            document.getElementById('rtsp-option').classList.remove('active');
-            document.getElementById('rtsp-form').classList.remove('active');
-            
-            // Show video container
-            document.getElementById('video-container').classList.add('active');
-            document.getElementById('status-indicator').textContent = '🔴 Live Monitoring Active';
-            document.getElementById('status-indicator').classList.add('live');
-            
-            // Start webcam stream
-            currentStream = 'webcam';
-            const videoElement = document.getElementById('video-stream');
-            videoElement.src = '/webapp';
-            videoElement.style.display = 'block';
-            document.getElementById('loading-message').style.display = 'none';
-        }
-
-        function selectRTSP() {
-            document.getElementById('rtsp-option').classList.add('active');
-            document.getElementById('webcam-option').classList.remove('active');
-            document.getElementById('rtsp-form').classList.add('active');
-            document.getElementById('video-container').classList.remove('active');
-        }
-
-
-        function startMultiRTSP() {
-            const urls = [
-                document.getElementById('rtsp-url1').value.trim(),
-                document.getElementById('rtsp-url2').value.trim(),
-                document.getElementById('rtsp-url3').value.trim()
-            ].filter(url => url);
-            if (urls.length === 0) {
-                alert('Please enter at least one RTSP URL');
-                return;
-            }
-            for (let url of urls) {
-                if (!url.toLowerCase().startsWith('rtsp://')) {
-                    alert('RTSP URL must start with rtsp://');
-                    return;
-                }
-            }
-            document.getElementById('rtsp-form').classList.remove('active');
-            document.getElementById('video-container').style.display = 'block';
-            document.getElementById('status-indicator').textContent = '🔴 Connecting to RTSP Streams...';
-            document.getElementById('status-indicator').classList.remove('live');
-            const feed = document.getElementById('multi-stream-feed');
-            feed.innerHTML = '';
-            urls.forEach((url, idx) => {
-                const encodedUrl = encodeURIComponent(url);
-                const img = document.createElement('img');
-                img.style.maxWidth = '400px';
-                img.style.border = '2px solid #27ae60';
-                img.style.borderRadius = '8px';
-                img.style.margin = '10px';
-                img.alt = `Camera ${idx+1} Stream`;
-                img.src = `/rtsp_stream?url=${encodedUrl}`;
-                feed.appendChild(img);
-            });
-            document.getElementById('status-indicator').textContent = '🔴 RTSP Streams Active';
-            document.getElementById('status-indicator').classList.add('live');
-        }
-
-        function cancelRTSP() {
-            document.getElementById('rtsp-form').classList.remove('active');
-            document.getElementById('rtsp-option').classList.remove('active');
-            document.getElementById('rtsp-url').value = '';
-        }
-
-        function stopStream() {
-            currentStream = null;
-            document.getElementById('video-container').classList.remove('active');
-            document.getElementById('webcam-option').classList.remove('active');
-            document.getElementById('rtsp-option').classList.remove('active');
-            document.getElementById('video-stream').src = '';
-            document.getElementById('video-stream').style.display = 'none';
-            document.getElementById('loading-message').style.display = 'block';
-            document.getElementById('loading-message').innerHTML = '<div style="font-size: 24px; margin-bottom: 10px;">📡</div><div>Initializing video stream...</div>';
-        }
-
         // Set active navigation item
         document.addEventListener('DOMContentLoaded', function() {
             const currentPath = window.location.pathname;
@@ -492,11 +406,53 @@
             navItems.forEach(item => {
                 item.classList.remove('active');
                 if (item.getAttribute('href') === currentPath || 
-                    (currentPath.includes('live_feed') && item.getAttribute('href') === '/live_feed')) {
+                    (currentPath.includes('webcam') && item.getAttribute('href') === '/webcam')) {
                     item.classList.add('active');
                 }
             });
+            
+            // Update camera status periodically
+            updateCameraStatus();
+            setInterval(updateCameraStatus, 5000); // Update every 5 seconds
         });
+        
+        async function updateCameraStatus() {
+            try {
+                const response = await fetch('/api/camera_status');
+                const status = await response.json();
+                
+                const statusDiv = document.getElementById('camera-status');
+                let statusText = '📊 Camera Status: ';
+                let activeCount = 0;
+                
+                Object.keys(status).forEach(cameraKey => {
+                    const camera = status[cameraKey];
+                    if (camera.running) {
+                        activeCount++;
+                        statusText += `✅ ${cameraKey.replace('_', ' ').toUpperCase()} `;
+                    } else {
+                        statusText += `❌ ${cameraKey.replace('_', ' ').toUpperCase()} `;
+                    }
+                });
+                
+                statusText += `(${activeCount}/${Object.keys(status).length} active)`;
+                statusDiv.textContent = statusText;
+                
+                // Update status indicator
+                const indicator = document.querySelector('.status-indicator');
+                if (activeCount > 0) {
+                    indicator.textContent = '🔴 Multi-Camera RTSP Monitoring Active';
+                    indicator.classList.add('live');
+                } else {
+                    indicator.textContent = '⚪ No Cameras Active';
+                    indicator.classList.remove('live');
+                }
+                
+            } catch (error) {
+                console.error('Error updating camera status:', error);
+                document.getElementById('camera-status').textContent = '❌ Error loading camera status';
+            }
+        }
     </script>
 </body>
 </html>

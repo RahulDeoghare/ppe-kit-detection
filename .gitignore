@@ -78,6 +78,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+venv_gpu/
 
 # Spyder project settings
 .spyderproject

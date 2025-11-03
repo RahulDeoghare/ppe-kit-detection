@@ -234,19 +234,33 @@ def process_single_image(img, path_x, session_name, source_type, source_path, db
         return
 
 def process_video_stream(path_x, session_name, source_type, source_path, db_manager=None):
-    """Process video file or webcam stream"""
+    """Process video file or webcam stream with improved RTSP handling"""
 
     video_capture = path_x
-    cap = cv2.VideoCapture(video_capture)
+    cap = None
     
-    # Set video capture properties for better compatibility
-    if isinstance(video_capture, str):  # If it's a file path
-        # Try different backends for better codec support
+    # Try different backends for RTSP streams
+    if isinstance(video_capture, str) and video_capture.startswith('rtsp://'):
+        print(f"Attempting to open RTSP stream: {video_capture}")
+        
+        # Try FFMPEG backend first for RTSP
+        cap = cv2.VideoCapture(video_capture, cv2.CAP_FFMPEG)
         if not cap.isOpened():
-            cap = cv2.VideoCapture(video_capture, cv2.CAP_FFMPEG)
-        if not cap.isOpened():
-            cap = cv2.VideoCapture(video_capture, cv2.CAP_DSHOW)
+            print("FFMPEG backend failed, trying default backend...")
+            cap = cv2.VideoCapture(video_capture)
             
+        if not cap.isOpened():
+            print(f"Failed to open RTSP stream: {video_capture}")
+            print("Possible issues:")
+            print("  - Camera not reachable (check network connectivity)")
+            print("  - Incorrect RTSP URL or credentials")
+            print("  - Camera not powered on or configured")
+            print("  - Firewall blocking RTSP port (554)")
+            return
+    else:
+        # For regular video files or webcam
+        cap = cv2.VideoCapture(video_capture)
+    
     if not cap.isOpened():
         print(f"Error: Could not open video {path_x}")
         return
@@ -256,6 +270,10 @@ def process_video_stream(path_x, session_name, source_type, source_path, db_mana
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     print(f"Video properties: {width}x{height} @ {fps} FPS")
+    
+    # Set buffer size for RTSP streams to reduce latency
+    if isinstance(video_capture, str) and video_capture.startswith('rtsp://'):
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
     
     # Initialize YOLO model with GPU support
     model = YOLO("YOLO-Weights/ppe.pt")
@@ -271,14 +289,21 @@ def process_video_stream(path_x, session_name, source_type, source_path, db_mana
 
     aggregated_violations = {}
     frame_count = 0
+    consecutive_errors = 0
+    max_consecutive_errors = 10
 
     try:
         while True:
             success, img = cap.read()
             if not success:
-                print("Error: Failed to read frame from video.")
-                break
-
+                consecutive_errors += 1
+                print(f"Error: Failed to read frame from video (attempt {consecutive_errors}/{max_consecutive_errors}).")
+                if consecutive_errors >= max_consecutive_errors:
+                    print("Too many consecutive frame read errors. Stopping stream.")
+                    break
+                continue
+            
+            consecutive_errors = 0  # Reset error counter on successful read
             img = cv2.resize(img, (1280, 720))
 
             # Validate frame
@@ -372,6 +397,7 @@ def process_video_stream(path_x, session_name, source_type, source_path, db_mana
 
             yield img
     finally:
-        cap.release()
+        if cap:
+            cap.release()
         cv2.destroyAllWindows()
 
