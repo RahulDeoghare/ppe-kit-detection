@@ -96,7 +96,7 @@ class DatabaseManager:
                                 confidence: float,
                                 image_frame,
                                 whole_frame=None,
-                                severity: str = "HIGH",
+                                severity: str = "high",
                                 source_type: str = "webcam",
                                 source_path: str = None):
         """Save violation with screenshot to database - SINGLE TABLE APPROACH"""
@@ -105,9 +105,11 @@ class DatabaseManager:
         x1, y1, x2, y2 = bbox
         timestamp = datetime.now(timezone.utc)
         
-        # Save cropped violation image
-        image_data = None
-        image_path = None
+        # Ensure severity is lowercase to match database constraint
+        severity = severity.lower()
+        
+        # Save violation screenshot
+        screenshot_path = ""  # Default empty path
         
         if image_frame is not None:
             try:
@@ -118,55 +120,28 @@ class DatabaseManager:
                 # Save image file
                 timestamp_str = timestamp.strftime("%Y%m%d_%H%M%S_%f")[:-3]
                 image_filename = f"violation_{timestamp_str}.jpg"
-                image_path = os.path.join(violations_dir, image_filename)
+                screenshot_path = os.path.join(violations_dir, image_filename)
                 
-                cv2.imwrite(image_path, image_frame)
+                cv2.imwrite(screenshot_path, image_frame)
                 
-                # Also encode as binary data for database storage (backup)
-                _, buffer = cv2.imencode('.jpg', image_frame)
-                image_data = buffer.tobytes()
-                
-                logger.info(f"Saved violation image: {image_path}")
+                logger.info(f"Saved violation screenshot: {screenshot_path}")
                 
             except Exception as e:
-                logger.error(f"Failed to save violation image: {e}")
-        
-        # Save whole frame image
-        whole_frame_data = None
-        whole_frame_path = None
-        
-        if whole_frame is not None:
-            try:
-                # Save whole frame file
-                timestamp_str = timestamp.strftime("%Y%m%d_%H%M%S_%f")[:-3]
-                whole_frame_filename = f"whole_frame_{timestamp_str}.jpg"
-                whole_frame_path = os.path.join(violations_dir, whole_frame_filename)
-                
-                cv2.imwrite(whole_frame_path, whole_frame)
-                
-                # Also encode as binary data for database storage (backup)
-                _, buffer = cv2.imencode('.jpg', whole_frame)
-                whole_frame_data = buffer.tobytes()
-                
-                logger.info(f"Saved whole frame image: {whole_frame_path}")
-                
-            except Exception as e:
-                logger.error(f"Failed to save whole frame image: {e}")
+                logger.error(f"Failed to save violation screenshot: {e}")
+                screenshot_path = ""  # Set empty path if saving fails
         
         try:
             with self.get_connection() as conn:
                 with conn.cursor() as cursor:
                     cursor.execute("""
                         INSERT INTO ppe_violations 
-                        (violation_id, session_name, source_type, source_path, violation_type, 
+                        (violation_id, session_name, source_type, violation_type, 
                          person_id, frame_number, bbox_x1, bbox_y1, bbox_x2, bbox_y2, 
-                         confidence, severity, image_path, image_data, whole_frame_path, 
-                         whole_frame_data, timestamp)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (violation_id, session_name, source_type, source_path, violation_type,
+                         confidence, severity, screenshot_path, timestamp)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (violation_id, session_name, source_type, violation_type,
                          person_id, frame_number, x1, y1, x2, y2, 
-                         confidence, severity, image_path, image_data, whole_frame_path,
-                         whole_frame_data, timestamp))
+                         confidence, severity, screenshot_path, timestamp))
                     conn.commit()
                     
                     logger.info(f"Saved violation: {violation_type} for person {person_id} in session {session_name}")
@@ -193,15 +168,13 @@ class DatabaseManager:
                             violation_id,
                             session_name,
                             source_type,
-                            source_path,
                             violation_type,
                             person_id,
                             frame_number,
                             bbox_x1, bbox_y1, bbox_x2, bbox_y2,
                             confidence,
                             severity,
-                            image_path,
-                            whole_frame_path,
+                            screenshot_path,
                             acknowledged,
                             acknowledged_by,
                             acknowledged_at,

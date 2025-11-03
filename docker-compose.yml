@@ -11,7 +11,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./database/violations_only.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - ppe_network
     restart: unless-stopped

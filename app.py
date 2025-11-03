@@ -51,9 +51,22 @@ def home():
     session.clear()
     return render_template('indexproject.html')
 
+
+# Multi-camera support: UI for entering up to 3 RTSP URLs
 @app.route("/webcam", methods=['GET', 'POST'])
 def webcam():
     session.clear()
+    if request.method == 'POST':
+        # Get up to 3 RTSP URLs from form
+        rtsp_urls = [
+            request.form.get('rtsp_url1', '').strip(),
+            request.form.get('rtsp_url2', '').strip(),
+            request.form.get('rtsp_url3', '').strip()
+        ]
+        # Filter out empty URLs
+        rtsp_urls = [url for url in rtsp_urls if url]
+        session['rtsp_urls'] = rtsp_urls
+        return render_template('multi_stream.html', rtsp_urls=rtsp_urls)
     return render_template('ui.html')
 
 @app.route("/live_feed", methods=['GET', 'POST'])
@@ -81,11 +94,14 @@ def video():
 def webapp():
     return Response(generate_frames(path_x=0), mimetype='multipart/x-mixed-replace; boundary=frame')
 
+
+
+# Generic RTSP stream endpoint for any URL (for multi-stream live_feed.html)
 @app.route('/rtsp_stream')
 def rtsp_stream():
-    rtsp_url = request.args.get('url', '')
+    rtsp_url = request.args.get('url', '').strip()
     if rtsp_url:
-        return Response(generate_frames(path_x=rtsp_url), 
+        return Response(generate_frames(path_x=rtsp_url),
                         mimetype='multipart/x-mixed-replace; boundary=frame')
     else:
         return "No RTSP URL provided", 400

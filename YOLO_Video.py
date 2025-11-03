@@ -203,7 +203,7 @@ def process_single_image(img, path_x, session_name, source_type, source_path, db
                                     confidence=conf,
                                     image_frame=violation_image,
                                     whole_frame=img.copy(),
-                                    severity="HIGH" if conf > 0.8 else "MEDIUM",
+                                    severity="high" if conf > 0.8 else "medium",
                                     source_type=source_type,
                                     source_path=source_path
                                 )
@@ -279,6 +279,8 @@ def process_video_stream(path_x, session_name, source_type, source_path, db_mana
                 print("Error: Failed to read frame from video.")
                 break
 
+            img = cv2.resize(img, (1280, 720))
+
             # Validate frame
             if img is None or img.size == 0:
                 print("Warning: Empty frame received, skipping...")
@@ -346,7 +348,7 @@ def process_video_stream(path_x, session_name, source_type, source_path, db_mana
                                         confidence=conf,
                                         image_frame=violation_image,
                                         whole_frame=img.copy(),
-                                        severity="HIGH" if conf > 0.8 else "MEDIUM",
+                                        severity="high" if conf > 0.8 else "medium",
                                         source_type=source_type,
                                         source_path=source_path
                                     )
