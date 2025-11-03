@@ -99,7 +99,7 @@ class DatabaseManager:
                                 severity: str = "high",
                                 source_type: str = "webcam",
                                 source_path: str = None):
-        """Save violation with screenshot to database - SINGLE TABLE APPROACH"""
+        """Save violation with both bounding box screenshot and whole frame to database"""
         
         violation_id = str(uuid.uuid4())
         x1, y1, x2, y2 = bbox
@@ -108,7 +108,7 @@ class DatabaseManager:
         # Ensure severity is lowercase to match database constraint
         severity = severity.lower()
         
-        # Save violation screenshot
+        # Save violation screenshot (bounding box area)
         screenshot_path = ""  # Default empty path
         
         if image_frame is not None:
@@ -117,18 +117,40 @@ class DatabaseManager:
                 violations_dir = "violations"
                 os.makedirs(violations_dir, exist_ok=True)
                 
-                # Save image file
+                # Save bounding box image file
                 timestamp_str = timestamp.strftime("%Y%m%d_%H%M%S_%f")[:-3]
-                image_filename = f"violation_{timestamp_str}.jpg"
+                image_filename = f"violation_bbox_{timestamp_str}.jpg"
                 screenshot_path = os.path.join(violations_dir, image_filename)
                 
                 cv2.imwrite(screenshot_path, image_frame)
                 
-                logger.info(f"Saved violation screenshot: {screenshot_path}")
+                logger.info(f"Saved violation bounding box screenshot: {screenshot_path}")
                 
             except Exception as e:
-                logger.error(f"Failed to save violation screenshot: {e}")
+                logger.error(f"Failed to save violation bounding box screenshot: {e}")
                 screenshot_path = ""  # Set empty path if saving fails
+        
+        # Save whole frame screenshot
+        whole_frame_path = ""  # Default empty path
+        
+        if whole_frame is not None:
+            try:
+                # Create violations directory if it doesn't exist
+                violations_dir = "violations"
+                os.makedirs(violations_dir, exist_ok=True)
+                
+                # Save whole frame image file
+                timestamp_str = timestamp.strftime("%Y%m%d_%H%M%S_%f")[:-3]
+                frame_filename = f"violation_frame_{timestamp_str}.jpg"
+                whole_frame_path = os.path.join(violations_dir, frame_filename)
+                
+                cv2.imwrite(whole_frame_path, whole_frame)
+                
+                logger.info(f"Saved violation whole frame screenshot: {whole_frame_path}")
+                
+            except Exception as e:
+                logger.error(f"Failed to save violation whole frame screenshot: {e}")
+                whole_frame_path = ""  # Set empty path if saving fails
         
         try:
             with self.get_connection() as conn:
@@ -137,11 +159,11 @@ class DatabaseManager:
                         INSERT INTO ppe_violations 
                         (violation_id, session_name, source_type, violation_type, 
                          person_id, frame_number, bbox_x1, bbox_y1, bbox_x2, bbox_y2, 
-                         confidence, severity, screenshot_path, timestamp)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                         confidence, severity, screenshot_path, whole_frame_path, timestamp)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """, (violation_id, session_name, source_type, violation_type,
                          person_id, frame_number, x1, y1, x2, y2, 
-                         confidence, severity, screenshot_path, timestamp))
+                         confidence, severity, screenshot_path, whole_frame_path, timestamp))
                     conn.commit()
                     
                     logger.info(f"Saved violation: {violation_type} for person {person_id} in session {session_name}")
@@ -175,6 +197,7 @@ class DatabaseManager:
                             confidence,
                             severity,
                             screenshot_path,
+                            whole_frame_path,
                             acknowledged,
                             acknowledged_by,
                             acknowledged_at,
@@ -203,14 +226,13 @@ class DatabaseManager:
                             violation_id,
                             session_name,
                             source_type,
-                            source_path,
                             violation_type,
                             person_id,
                             frame_number,
                             bbox_x1, bbox_y1, bbox_x2, bbox_y2,
                             confidence,
                             severity,
-                            image_path,
+                            screenshot_path,
                             whole_frame_path,
                             acknowledged,
                             acknowledged_by,
@@ -233,7 +255,7 @@ class DatabaseManager:
             with self.get_connection() as conn:
                 with conn.cursor() as cursor:
                     cursor.execute("""
-                        SELECT image_path FROM ppe_violations 
+                        SELECT screenshot_path FROM ppe_violations 
                         WHERE violation_id = %s
                     """, (violation_id,))
                     result = cursor.fetchone()
@@ -258,34 +280,14 @@ class DatabaseManager:
             raise
 
     def get_violation_image(self, violation_id: str) -> Optional[bytes]:
-        """Get violation image binary data (fallback for missing files)"""
-        try:
-            with self.get_connection() as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute("""
-                        SELECT image_data FROM ppe_violations 
-                        WHERE violation_id = %s
-                    """, (violation_id,))
-                    result = cursor.fetchone()
-                    return result[0] if result and result[0] else None
-        except Exception as e:
-            logger.error(f"Failed to get violation image: {e}")
-            raise
+        """Get violation image binary data (fallback for missing files) - not stored in DB"""
+        # Binary image data is not stored in the database, only file paths
+        return None
 
     def get_whole_frame_image(self, violation_id: str) -> Optional[bytes]:
-        """Get whole frame image binary data (fallback for missing files)"""
-        try:
-            with self.get_connection() as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute("""
-                        SELECT whole_frame_data FROM ppe_violations 
-                        WHERE violation_id = %s
-                    """, (violation_id,))
-                    result = cursor.fetchone()
-                    return result[0] if result and result[0] else None
-        except Exception as e:
-            logger.error(f"Failed to get whole frame image: {e}")
-            raise
+        """Get whole frame image binary data (fallback for missing files) - not stored in DB"""
+        # Binary image data is not stored in the database, only file paths
+        return None
     
     def acknowledge_violation(self, violation_id: str, acknowledged_by: str = "web_user", notes: str = None):
         """Mark violation as acknowledged"""

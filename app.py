@@ -176,8 +176,8 @@ def api_violations():
                 'bbox_y1': violation['bbox_y1'],
                 'bbox_x2': violation['bbox_x2'],
                 'bbox_y2': violation['bbox_y2'],
-                'image_path': violation['image_path'],
-                'whole_frame_path': violation['whole_frame_path'],
+                'image_path': violation['screenshot_path'],  # Bounding box screenshot
+                'whole_frame_path': violation['whole_frame_path'],  # Whole frame screenshot
                 'acknowledged': violation['acknowledged'],
                 'acknowledged_by': violation['acknowledged_by'],
                 'acknowledged_at': violation['acknowledged_at'].isoformat() if violation['acknowledged_at'] else None,
