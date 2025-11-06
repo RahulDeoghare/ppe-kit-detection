@@ -30,9 +30,9 @@ class DatabaseManager:
     def __init__(self, 
                  host: str = "localhost",
                  port: int = 5432,
-                 database: str = "ppe_detection",
-                 user: str = "ppe_user", 
-                 password: str = None,
+                 database: str = "vms_staging",
+                 user: str = "postgres", 
+                 password: str = "fostgres",
                  min_connections: int = 1,
                  max_connections: int = 10):
         
@@ -98,7 +98,11 @@ class DatabaseManager:
                                 whole_frame=None,
                                 severity: str = "high",
                                 source_type: str = "webcam",
-                                source_path: str = None):
+                                source_path: str = None,
+                                camera_id: str = None,
+                                device_id: str = None,
+                                office_id: str = None,
+                                status: str = "pending"):
         """Save violation with both bounding box screenshot and whole frame to database"""
         
         violation_id = str(uuid.uuid4())
@@ -107,6 +111,18 @@ class DatabaseManager:
         
         # Ensure severity is lowercase to match database constraint
         severity = severity.lower()
+        
+        # Set camera_id if not provided
+        if camera_id is None:
+            camera_id = "b48ff955-d517-44ba-939a-97d7c76c17b6"
+        
+        # Set device_id if not provided
+        if device_id is None:
+            device_id = "01a0ea94-6d15-4740-b97e-95cb7c65e112"
+        
+        # Set office_id if not provided
+        if office_id is None:
+            office_id = "48ee8982-56bd-4d49-bd24-4b148d73d8f3"
         
         # Save violation screenshot (bounding box area)
         screenshot_path = ""  # Default empty path
@@ -157,13 +173,13 @@ class DatabaseManager:
                 with conn.cursor() as cursor:
                     cursor.execute("""
                         INSERT INTO ppe_violations 
-                        (violation_id, session_name, source_type, violation_type, 
-                         person_id, frame_number, bbox_x1, bbox_y1, bbox_x2, bbox_y2, 
-                         confidence, severity, screenshot_path, whole_frame_path, timestamp)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (violation_id, session_name, source_type, violation_type,
-                         person_id, frame_number, x1, y1, x2, y2, 
-                         confidence, severity, screenshot_path, whole_frame_path, timestamp))
+                        (violation_id, session_name, source_type, camera_id, device_id, office_id, violation_type, 
+                         person_id, frame_number, status, bbox_x1, bbox_y1, bbox_x2, bbox_y2, 
+                         confidence, severity, screenshot_path, whole_frame_path, timestamp, updated_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (violation_id, session_name, source_type, camera_id, device_id, office_id, violation_type,
+                         person_id, frame_number, status, x1, y1, x2, y2, 
+                         confidence, severity, screenshot_path, whole_frame_path, timestamp, timestamp))
                     conn.commit()
                     
                     logger.info(f"Saved violation: {violation_type} for person {person_id} in session {session_name}")
@@ -190,20 +206,25 @@ class DatabaseManager:
                             violation_id,
                             session_name,
                             source_type,
+                            camera_id,
+                            device_id,
+                            office_id,
                             violation_type,
                             person_id,
                             frame_number,
+                            status,
                             bbox_x1, bbox_y1, bbox_x2, bbox_y2,
                             confidence,
                             severity,
                             screenshot_path,
                             whole_frame_path,
                             acknowledged,
-                            acknowledged_by,
+                            acknowledge_by,
                             acknowledged_at,
                             notes,
                             timestamp,
-                            created_at
+                            created_at,
+                            updated_at
                         FROM ppe_violations 
                         ORDER BY timestamp DESC
                         LIMIT %s OFFSET %s
@@ -226,9 +247,13 @@ class DatabaseManager:
                             violation_id,
                             session_name,
                             source_type,
+                            camera_id,
+                            device_id,
+                            office_id,
                             violation_type,
                             person_id,
                             frame_number,
+                            status,
                             bbox_x1, bbox_y1, bbox_x2, bbox_y2,
                             confidence,
                             severity,
@@ -239,7 +264,8 @@ class DatabaseManager:
                             acknowledged_at,
                             notes,
                             timestamp,
-                            created_at
+                            created_at,
+                            updated_at
                         FROM ppe_violations 
                         ORDER BY timestamp DESC
                         LIMIT %s
