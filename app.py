@@ -238,9 +238,7 @@ def home():
 
 # Hardcoded RTSP URLs for multi-camera live feed
 RTSP_URLS = [
-    "rtsp://admin:India123%23@192.168.9.101:554/cam/realmonitor?channel=1&subtype=0",  # Camera 1
-    "rtsp://admin:India123%23@192.168.9.102:554/cam/realmonitor?channel=1&subtype=0",  # Camera 2
-    "rtsp://admin:India123%23@192.168.9.103:554/cam/realmonitor?channel=1&subtype=0"   # Camera 3
+    "rtsp://admin:India123%23@10.45.1.63:5545/cam/realmonitor?channel=1&subtype=0" # Camera 1  # Camera 3
 ]  # Replace with your actual RTSP URLs
 
 # Multi-camera support: UI for starting RTSP feeds

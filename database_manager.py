@@ -136,9 +136,10 @@ class DatabaseManager:
                 # Save bounding box image file
                 timestamp_str = timestamp.strftime("%Y%m%d_%H%M%S_%f")[:-3]
                 image_filename = f"violation_bbox_{timestamp_str}.jpg"
-                screenshot_path = os.path.join(violations_dir, image_filename)
+                relative_path = os.path.join(violations_dir, image_filename)
+                screenshot_path = os.path.abspath(relative_path)  # Convert to absolute path
                 
-                cv2.imwrite(screenshot_path, image_frame)
+                cv2.imwrite(relative_path, image_frame)  # Still use relative path for file writing
                 
                 logger.info(f"Saved violation bounding box screenshot: {screenshot_path}")
                 
@@ -158,9 +159,10 @@ class DatabaseManager:
                 # Save whole frame image file
                 timestamp_str = timestamp.strftime("%Y%m%d_%H%M%S_%f")[:-3]
                 frame_filename = f"violation_frame_{timestamp_str}.jpg"
-                whole_frame_path = os.path.join(violations_dir, frame_filename)
+                relative_path = os.path.join(violations_dir, frame_filename)
+                whole_frame_path = os.path.abspath(relative_path)  # Convert to absolute path
                 
-                cv2.imwrite(whole_frame_path, whole_frame)
+                cv2.imwrite(relative_path, whole_frame)  # Still use relative path for file writing
                 
                 logger.info(f"Saved violation whole frame screenshot: {whole_frame_path}")
                 
