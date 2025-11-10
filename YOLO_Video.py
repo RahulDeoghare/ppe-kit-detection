@@ -6,79 +6,94 @@ import time
 import csv
 import logging
 import json
+import os
 from datetime import datetime
 import torch
 from database_manager import get_db_manager, wait_for_db
-from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
 
-# Configure logging
 logging.basicConfig(filename='alert_timing.log', level=logging.INFO, format='%(asctime)s - %(message)s')
-logger = logging.getLogger(__name__)
-
-# Configuration flags from environment
-SAVE_TO_JSON = os.getenv('SAVE_VIOLATIONS_TO_JSON', 'false').lower() == 'true'
-SAVE_TO_CSV = os.getenv('SAVE_VIOLATIONS_TO_CSV', 'true').lower() == 'true'
-SAVE_TO_DB = os.getenv('SAVE_VIOLATIONS_TO_DB', 'true').lower() == 'true'
 
 def save_violation_to_json(violation_type, confidence, bbox, timestamp, person_id=None, frame_number=None):
     """
-    Save violation data to a JSON file (optional backup logging)
+    Save violation data to a JSON file
     """
-    if not SAVE_TO_JSON:
-        return
-        
     violation_data = {
-        "timestamp": timestamp.isoformat() if hasattr(timestamp, 'isoformat') else str(timestamp),
+        "timestamp": timestamp,
         "violation_type": violation_type,
         "confidence": confidence,
-        "bbox": bbox,
-        "person_id": person_id,
-        "frame_number": frame_number,
+        "bounding_box": {
+            "x1": bbox[0],
+            "y1": bbox[1], 
+            "x2": bbox[2],
+            "y2": bbox[3]
+        }
     }
+    
+    if person_id is not None:
+        violation_data["person_id"] = person_id
+    if frame_number is not None:
+        violation_data["frame_number"] = frame_number
+    
+    # Create violations directory if it doesn't exist
+    violations_dir = "violations"
+    if not os.path.exists(violations_dir):
+        os.makedirs(violations_dir)
+    
+    # Generate filename with timestamp
+    filename = f"violation_{timestamp.strftime('%Y%m%d_%H%M%S_%f')[:-3]}.json"
+    filepath = os.path.join(violations_dir, filename)
+    
+    # Save to JSON file
+    with open(filepath, 'w') as f:
+        json.dump(violation_data, f, indent=4, default=str)
+    
+    print(f"Violation saved to: {filepath}")
+    return filepath
 
-    try:
-        with open('violations.jsonl', 'a') as jf:
-            jf.write(json.dumps(violation_data) + '\n')
-    except Exception as e:
-        logger.error(f"Failed to write violation JSON: {e}")
+violation_tips = {
+    'Hardhat': 'Wearing a hardhat protects you from head injuries caused by falling objects or impact.',
+    'Mask': 'Wearing a mask helps protect you and others from airborne hazards and infectious agents.',
+    'NO-Hardhat': 'Not wearing a hardhat can lead to severe head injuries due to falling objects or impact.',
+    'NO-Mask': 'Not wearing a mask increases the risk of exposure to airborne hazards and infectious agents.',
+    'NO-Safety Vest': 'Not wearing a safety vest makes you less visible, increasing the risk of accidents in low-light conditions.',
+    'Safety Vest': 'Wearing a safety vest ensures that you are visible to others, especially in low-light conditions.',
+    'Person': 'Ensure all safety gear is worn properly to avoid injuries.',
+    'Safety Cone': 'Safety cones help in marking safe areas and guiding pedestrian or vehicular traffic.',
+    'machinery': 'Machinery should be operated with care, ensuring all safety protocols are followed.',
+    'vehicle': 'Vehicles should be operated carefully in designated areas to prevent accidents.'
+}
 
-def log_detection_to_csv(person_id, detected_items):
-    """Log detection to CSV (optional backup logging)"""
-    if not SAVE_TO_CSV:
-        return
-        
-    try:
-        with open('detection_log.csv', mode='a', newline='') as file:
-            writer = csv.writer(file)
-            timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-            items_str = ', '.join(detected_items)
-            writer.writerow([timestamp, person_id, items_str])
-    except Exception as e:
-        logger.error(f"Failed to write to CSV: {e}")
+def log_time_taken(action, start_time):
+    end_time = time.time()
+    duration = end_time - start_time
+    logging.info(f"{action} took {duration:.2f} seconds")
+    print(f"{action} took {duration:.2f} seconds")
 
 
 def aggregate_violations(persons_violations):
-    """Simple aggregator for persons_violations dict."""
-    aggregated = {}
-    for pid, items in persons_violations.items():
-        # keep items as-is; ensure it's a list
-        aggregated[pid] = list(items) if items is not None else []
-    return aggregated
+    aggregated_violations = {}
+    for person_id, violations in persons_violations.items():
+        if person_id not in aggregated_violations:
+            aggregated_violations[person_id] = []
+        aggregated_violations[person_id].extend(violations)
+    return aggregated_violations
+
+def log_detection_to_csv(person_id, detected_items):
+
+    with open('detection_log.csv', mode='a', newline='') as file:
+        writer = csv.writer(file)
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+        items_str = ', '.join(detected_items)
+        writer.writerow([timestamp, person_id, items_str])
 
 def video_detection(path_x):
-    # Initialize database connection
-    db_manager = None
-    if SAVE_TO_DB:
-        if not wait_for_db():
-            logger.error("Database not available! Violations will not be saved to database.")
-            if not (SAVE_TO_CSV or SAVE_TO_JSON):
-                raise Exception("No logging method available - database unavailable and backup logging disabled")
-        else:
-            db_manager = get_db_manager()
-            logger.info("✅ Database connection established - violations will be saved directly to database")
+    # Initialize database
+    if not wait_for_db():
+        print("Warning: Database not available, falling back to CSV logging only")
+        db_manager = None
+    else:
+        db_manager = get_db_manager()
     
     # Generate session name
     timestamp = datetime.now()
@@ -86,17 +101,10 @@ def video_detection(path_x):
     source_type = "webcam" if path_x == 0 else "video_file" if isinstance(path_x, str) else "unknown"
     source_path = str(path_x) if path_x != 0 else None
     
-    logger.info(f"🔍 Starting detection session: {session_name}")
-    logger.info(f"📊 Logging config - DB: {SAVE_TO_DB}, CSV: {SAVE_TO_CSV}, JSON: {SAVE_TO_JSON}")
-    
-    # Initialize CSV if enabled
-    if SAVE_TO_CSV:
-        try:
-            with open('detection_log.csv', mode='w', newline='') as file:
-                writer = csv.writer(file)
-                writer.writerow(['Timestamp', 'Person ID', 'Items Detected'])
-        except Exception as e:
-            logger.error(f"Failed to initialize CSV logging: {e}")
+    # Keep CSV logging for backward compatibility
+    with open('detection_log.csv', mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(['Timestamp', 'Person ID', 'Items Detected'])
 
     # Check if the input is an image or video
     image_extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif')
@@ -130,8 +138,8 @@ def process_single_image(img, path_x, session_name, source_type, source_path, db
     
     # Move model to GPU if available
     model.to(device)
-    classNames = ['Hardhat', 'NO-Hardhat', 'NO-Safety Vest',
-                  'Safety Vest',]
+    classNames = ['Hardhat', 'Mask', 'NO-Hardhat', 'NO-Mask', 'NO-Safety Vest', 'Person', 'Safety Cone',
+                  'Safety Vest', 'machinery', 'vehicle']
 
     # Validate and process the image
     if img is None or img.size == 0:
@@ -153,42 +161,11 @@ def process_single_image(img, path_x, session_name, source_type, source_path, db
         for r in results:
             boxes = r.boxes
             for box in boxes:
-                # Defensive extraction of box coordinates / conf / class
-                try:
-                    # coords may be nested (tensor) or direct list
-                    coords = None
-                    if hasattr(box, 'xyxy'):
-                        try:
-                            coords = box.xyxy[0]
-                        except Exception:
-                            coords = box.xyxy
-                    if coords is None:
-                        raise ValueError('No coordinates in box')
-
-                    x1, y1, x2, y2 = map(int, map(float, coords))
-
-                    # confidence
-                    try:
-                        conf_val = float(box.conf[0])
-                    except Exception:
-                        conf_val = float(box.conf) if hasattr(box, 'conf') else 0.0
-                    conf = math.ceil((conf_val * 100)) / 100
-
-                    # class index
-                    try:
-                        cls_idx = int(box.cls[0])
-                    except Exception:
-                        cls_idx = int(box.cls) if hasattr(box, 'cls') else -1
-
-                    if cls_idx < 0 or cls_idx >= len(classNames):
-                        print(f"⚠️  Skipping unknown class index: {cls_idx}")
-                        continue
-
-                    class_name = classNames[cls_idx]
-                except Exception as e:
-                    print(f"⚠️  Skipping malformed detection box: {e}")
-                    continue
-
+                x1, y1, x2, y2 = box.xyxy[0]
+                x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+                conf = math.ceil((box.conf[0] * 100)) / 100
+                cls = int(box.cls[0])
+                class_name = classNames[cls]
                 label = f'{class_name}{conf}'
 
                 if conf > 0.5:
@@ -196,20 +173,28 @@ def process_single_image(img, path_x, session_name, source_type, source_path, db
                         person_count += 1
                         persons_violations[person_count] = []
                     
-                    elif class_name in ['NO-Hardhat', 'NO-Safety Vest']:
+                    elif class_name in ['NO-Hardhat', 'NO-Mask', 'NO-Safety Vest']:
                         if person_count in persons_violations:
                             persons_violations[person_count].append(class_name)
                         
+                        # Save violation to JSON (keep for backward compatibility)
                         timestamp = datetime.now()
-                        violation_saved = False
+                        save_violation_to_json(
+                            violation_type=class_name,
+                            confidence=conf,
+                            bbox=(x1, y1, x2, y2),
+                            timestamp=timestamp,
+                            person_id=person_count,
+                            frame_number=1  # Single image, so frame 1
+                        )
                         
-                        # PRIMARY: Save violation to database
-                        if db_manager and SAVE_TO_DB:
+                        # Save violation with screenshot to database - SIMPLIFIED APPROACH
+                        if db_manager:
                             try:
                                 # Extract the region of interest (bounding box area) for screenshot
                                 violation_image = img[y1:y2, x1:x2].copy()
                                 
-                                violation_id = db_manager.save_violation_with_image(
+                                db_manager.save_violation_with_image(
                                     session_name=session_name,
                                     violation_type=class_name,
                                     person_id=person_count,
@@ -222,21 +207,9 @@ def process_single_image(img, path_x, session_name, source_type, source_path, db
                                     source_type=source_type,
                                     source_path=source_path
                                 )
-                                logger.info(f"✅ Saved violation to DB: {class_name} for person {person_count} (ID: {violation_id})")
-                                violation_saved = True
+                                print(f"Saved violation: {class_name} for person {person_count}")
                             except Exception as e:
-                                logger.error(f"❌ Failed to save violation to database: {e}")
-                        
-                        # BACKUP: Save to JSON if enabled or if database save failed
-                        if not violation_saved or SAVE_TO_JSON:
-                            save_violation_to_json(
-                                violation_type=class_name,
-                                confidence=conf,
-                                bbox=(x1, y1, x2, y2),
-                                timestamp=timestamp,
-                                person_id=person_count,
-                                frame_number=1
-                            )
+                                print(f"Failed to save violation to database: {e}")
                         
                         cv2.rectangle(img, (x1, y1), (x2, y2), (0, 0, 255), 3)
                         cv2.putText(img, label, (x1, y1 - 2), 0, 1, [255, 255, 255], thickness=1, lineType=cv2.LINE_AA)
@@ -311,8 +284,8 @@ def process_video_stream(path_x, session_name, source_type, source_path, db_mana
     
     # Move model to GPU if available
     model.to(device)
-    classNames = ['Hardhat', 'NO-Hardhat', 'NO-Safety Vest',
-                  'Safety Vest',]
+    classNames = ['Hardhat', 'Mask', 'NO-Hardhat', 'NO-Mask', 'NO-Safety Vest', 'Person', 'Safety Cone',
+                  'Safety Vest', 'machinery', 'vehicle']
 
     aggregated_violations = {}
     frame_count = 0
@@ -358,39 +331,11 @@ def process_video_stream(path_x, session_name, source_type, source_path, db_mana
             for r in results:
                 boxes = r.boxes
                 for box in boxes:
-                    # Defensive extraction for video processing as well
-                    try:
-                        coords = None
-                        if hasattr(box, 'xyxy'):
-                            try:
-                                coords = box.xyxy[0]
-                            except Exception:
-                                coords = box.xyxy
-                        if coords is None:
-                            raise ValueError('No coordinates in box')
-
-                        x1, y1, x2, y2 = map(int, map(float, coords))
-
-                        try:
-                            conf_val = float(box.conf[0])
-                        except Exception:
-                            conf_val = float(box.conf) if hasattr(box, 'conf') else 0.0
-                        conf = math.ceil((conf_val * 100)) / 100
-
-                        try:
-                            cls_idx = int(box.cls[0])
-                        except Exception:
-                            cls_idx = int(box.cls) if hasattr(box, 'cls') else -1
-
-                        if cls_idx < 0 or cls_idx >= len(classNames):
-                            print(f"⚠️  Skipping unknown class index: {cls_idx}")
-                            continue
-
-                        class_name = classNames[cls_idx]
-                    except Exception as e:
-                        print(f"⚠️  Skipping malformed detection box (video): {e}")
-                        continue
-
+                    x1, y1, x2, y2 = box.xyxy[0]
+                    x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+                    conf = math.ceil((box.conf[0] * 100)) / 100
+                    cls = int(box.cls[0])
+                    class_name = classNames[cls]
                     label = f'{class_name}{conf}'
 
                     if conf > 0.5:
@@ -398,20 +343,28 @@ def process_video_stream(path_x, session_name, source_type, source_path, db_mana
                             person_count += 1
                             persons_violations[person_count] = []
                         
-                        elif class_name in ['NO-Hardhat', 'NO-Safety Vest']:
+                        elif class_name in ['NO-Hardhat', 'NO-Mask', 'NO-Safety Vest']:
                             if person_count in persons_violations:
                                 persons_violations[person_count].append(class_name)
                             
+                            # Save violation to JSON (keep for backward compatibility)
                             timestamp = datetime.now()
-                            violation_saved = False
+                            save_violation_to_json(
+                                violation_type=class_name,
+                                confidence=conf,
+                                bbox=(x1, y1, x2, y2),
+                                timestamp=timestamp,
+                                person_id=person_count,
+                                frame_number=frame_count
+                            )
                             
-                            # PRIMARY: Save violation to database
-                            if db_manager and SAVE_TO_DB:
+                            # Save violation with screenshot to database - SIMPLIFIED APPROACH
+                            if db_manager:
                                 try:
                                     # Extract the region of interest (bounding box area) for screenshot
                                     violation_image = img[y1:y2, x1:x2].copy()
                                     
-                                    violation_id = db_manager.save_violation_with_image(
+                                    db_manager.save_violation_with_image(
                                         session_name=session_name,
                                         violation_type=class_name,
                                         person_id=person_count,
@@ -424,21 +377,9 @@ def process_video_stream(path_x, session_name, source_type, source_path, db_mana
                                         source_type=source_type,
                                         source_path=source_path
                                     )
-                                    logger.info(f"✅ Saved violation to DB: {class_name} for person {person_count} at frame {frame_count} (ID: {violation_id})")
-                                    violation_saved = True
+                                    print(f"Saved violation: {class_name} for person {person_count} at frame {frame_count}")
                                 except Exception as e:
-                                    logger.error(f"❌ Failed to save violation to database: {e}")
-                            
-                            # BACKUP: Save to JSON if enabled or if database save failed
-                            if not violation_saved or SAVE_TO_JSON:
-                                save_violation_to_json(
-                                    violation_type=class_name,
-                                    confidence=conf,
-                                    bbox=(x1, y1, x2, y2),
-                                    timestamp=timestamp,
-                                    person_id=person_count,
-                                    frame_number=frame_count
-                                )
+                                    print(f"Failed to save violation to database: {e}")
                             
                             cv2.rectangle(img, (x1, y1), (x2, y2), (0, 0, 255), 3)
                             cv2.putText(img, label, (x1, y1 - 2), 0, 1, [255, 255, 255], thickness=1, lineType=cv2.LINE_AA)
