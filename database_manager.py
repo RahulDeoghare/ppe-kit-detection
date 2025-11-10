@@ -86,6 +86,15 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"Connection test failed: {e}")
             return False
+
+    def _is_valid_uuid(self, uuid_string: str) -> bool:
+        """Check if string is a valid UUID format"""
+        import re
+        uuid_pattern = re.compile(
+            r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+            re.IGNORECASE
+        )
+        return bool(uuid_pattern.match(uuid_string))
     
     def save_violation_with_image(self,
                                 session_name: str,
@@ -109,19 +118,44 @@ class DatabaseManager:
         x1, y1, x2, y2 = bbox
         timestamp = datetime.now(timezone.utc)
         
+        # Convert image to binary data for database storage
+        violation_image_binary = None
+        if image_frame is not None:
+            try:
+                # Encode image as JPEG binary data
+                success, buffer = cv2.imencode('.jpg', image_frame)
+                if success:
+                    violation_image_binary = buffer.tobytes()
+                    logger.info(f"Encoded violation image to binary: {len(violation_image_binary)} bytes")
+            except Exception as e:
+                logger.error(f"Failed to encode violation image to binary: {e}")
+                violation_image_binary = None
+        
         # Ensure severity is lowercase to match database constraint
         severity = severity.lower()
         
-        # Set camera_id if not provided
+        # Set camera_id if not provided (use UUID format)
         if camera_id is None:
             camera_id = "b48ff955-d517-44ba-939a-97d7c76c17b6"
+        elif camera_id and not self._is_valid_uuid(camera_id):
+            # If provided but not a valid UUID, use default
+            logger.warning(f"Invalid camera_id format: {camera_id}, using default")
+            camera_id = "b48ff955-d517-44ba-939a-97d7c76c17b6"
         
-        # Set device_id if not provided
+        # Set device_id if not provided (use UUID format)
         if device_id is None:
             device_id = "01a0ea94-6d15-4740-b97e-95cb7c65e112"
+        elif device_id and not self._is_valid_uuid(device_id):
+            # If provided but not a valid UUID, use default
+            logger.warning(f"Invalid device_id format: {device_id}, using default")
+            device_id = "01a0ea94-6d15-4740-b97e-95cb7c65e112"
         
-        # Set office_id if not provided
+        # Set office_id if not provided (use UUID format)
         if office_id is None:
+            office_id = "48ee8982-56bd-4d49-bd24-4b148d73d8f3"
+        elif office_id and not self._is_valid_uuid(office_id):
+            # If provided but not a valid UUID, use default
+            logger.warning(f"Invalid office_id format: {office_id}, using default")
             office_id = "48ee8982-56bd-4d49-bd24-4b148d73d8f3"
         
         # Save violation screenshot (bounding box area)
@@ -175,14 +209,14 @@ class DatabaseManager:
                         INSERT INTO ppe_violations 
                         (violation_id, session_name, source_type, camera_id, device_id, office_id, violation_type, 
                          person_id, frame_number, status, bbox_x1, bbox_y1, bbox_x2, bbox_y2, 
-                         confidence, severity, screenshot_path, whole_frame_path, timestamp, updated_at)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                         confidence, severity, screenshot_path, whole_frame_path, violation_image_data, timestamp, updated_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """, (violation_id, session_name, source_type, camera_id, device_id, office_id, violation_type,
                          person_id, frame_number, status, x1, y1, x2, y2, 
-                         confidence, severity, screenshot_path, whole_frame_path, timestamp, timestamp))
+                         confidence, severity, screenshot_path, whole_frame_path, violation_image_binary, timestamp, timestamp))
                     conn.commit()
                     
-                    logger.info(f"Saved violation: {violation_type} for person {person_id} in session {session_name}")
+                    logger.info(f"Saved violation: {violation_type} for person {person_id} in session {session_name} with binary image data")
                     return violation_id
                     
         except Exception as e:
@@ -219,7 +253,7 @@ class DatabaseManager:
                             screenshot_path,
                             whole_frame_path,
                             acknowledged,
-                            acknowledge_by,
+                            acknowledged_by,
                             acknowledged_at,
                             notes,
                             timestamp,
@@ -375,13 +409,13 @@ def get_db_manager() -> DatabaseManager:
     """Get global database manager instance"""
     global db_manager
     if db_manager is None:
-        # Load from environment variables
+        # Load from environment variables with defaults matching your setup
         host = os.getenv('DB_HOST', 'localhost')
         # Convert localhost to 127.0.0.1 to avoid IPv6 issues on Windows
         if host == 'localhost':
             host = '127.0.0.1'
         
-        password = os.getenv('DB_PASSWORD', 'ppe_password')
+        password = os.getenv('DB_PASSWORD', 'postgres')
         # If password is empty, don't pass it (for trust authentication)
         if not password:
             password = None
@@ -389,8 +423,8 @@ def get_db_manager() -> DatabaseManager:
         db_manager = DatabaseManager(
             host=host,
             port=int(os.getenv('DB_PORT', 5432)),
-            database=os.getenv('DB_NAME', 'ppe_detection'),
-            user=os.getenv('DB_USER', 'ppe_user'),
+            database=os.getenv('DB_NAME', 'vms_staging'),
+            user=os.getenv('DB_USER', 'postgres'),
             password=password
         )
     return db_manager
@@ -419,11 +453,38 @@ if __name__ == "__main__":
         
         # Test getting violations
         violations = db.get_all_violations(limit=5)
-        print(f"✅ Found {len(violations)} violations")
+        print(f"✅ Found {len(violations)} existing violations")
         
         # Get session statistics
         stats = db.get_session_statistics()
         print(f"✅ Session statistics: {len(stats)} sessions")
-        print("✅ Test completed successfully!")
+        
+        # Test inserting a sample violation (for testing purposes)
+        import cv2
+        import numpy as np
+        try:
+            # Create a dummy test image
+            test_image = np.zeros((100, 100, 3), dtype=np.uint8)
+            test_image[:] = [255, 0, 0]  # Blue image
+            
+            test_violation_id = db.save_violation_with_image(
+                session_name="Test_Session_DB_Integration",
+                violation_type="NO-Hardhat",
+                person_id=1,
+                frame_number=1,
+                bbox=(10, 10, 50, 50),
+                confidence=0.95,
+                image_frame=test_image,
+                whole_frame=test_image,
+                severity="high",
+                source_type="test",
+                source_path=None
+            )
+            print(f"✅ Test violation saved successfully! ID: {test_violation_id}")
+            
+        except Exception as e:
+            print(f"❌ Test violation save failed: {e}")
+            
+        print("✅ Database integration test completed!")
     else:
         print("❌ Database connection failed!")

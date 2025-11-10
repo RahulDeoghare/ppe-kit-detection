@@ -23,6 +23,8 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY', 'konsberg')
 app.config['UPLOAD_FOLDER'] = os.getenv('FLASK_UPLOAD_FOLDER', 'static/files')
 
+
+
 class UploadFileForm(FlaskForm):
     file = FileField("File", validators=[InputRequired()])
     submit = SubmitField("Run")
@@ -236,18 +238,37 @@ def home():
     return render_template('indexproject.html')
 
 
-# Hardcoded RTSP URLs for multi-camera live feed
-RTSP_URLS = [
-    "rtsp://admin:India123%23@192.168.9.101:554/cam/realmonitor?channel=1&subtype=0",  # Camera 1
-    "rtsp://admin:India123%23@192.168.9.102:554/cam/realmonitor?channel=1&subtype=0",  # Camera 2
-    "rtsp://admin:India123%23@192.168.9.103:554/cam/realmonitor?channel=1&subtype=0"   # Camera 3
-]  # Replace with your actual RTSP URLs
+# Configuration for static camera URLs
+# Define your RTSP URLs directly here instead of fetching from backend
+DEFAULT_RTSP_URLS = [
+    "rtsp://admin:India123%23@10.45.1.63:5545/cam/realmonitor?channel=1&subtype=0",
+    # Add more camera URLs as needed
+    # "rtsp://admin:password@192.168.1.100:554/stream1",
+    # "rtsp://admin:password@192.168.1.101:554/stream1",
+]
+
+def get_rtsp_urls():
+    """Get static RTSP URLs"""
+    print(f"📹 Using {len(DEFAULT_RTSP_URLS)} configured camera(s)")
+    for i, url in enumerate(DEFAULT_RTSP_URLS, 1):
+        print(f"  Camera {i}: {url}")
+    return DEFAULT_RTSP_URLS
+
+# Get RTSP URLs
+RTSP_URLS = get_rtsp_urls()
 
 # Multi-camera support: UI for starting RTSP feeds
 @app.route("/webcam", methods=['GET', 'POST'])
 def webcam():
+    global RTSP_URLS
     session.clear()
     if request.method == 'POST':
+        # Use static camera configuration
+        RTSP_URLS = get_rtsp_urls()
+        
+        if not RTSP_URLS:
+            return render_template('ui.html', error="No cameras configured")
+        
         # Start background threads for all RTSP URLs
         print("🎬 Starting multi-camera background processing...")
         for i, rtsp_url in enumerate(RTSP_URLS, 1):
@@ -300,6 +321,11 @@ def rtsp_stream():
                         mimetype='multipart/x-mixed-replace; boundary=frame')
     else:
         return "No RTSP URL or camera_id provided", 400
+
+@app.route('/cameras')
+def camera_config():
+    """View camera configuration"""
+    return render_template('camera_config.html')
 
 @app.route('/violations')
 def violations():
@@ -358,6 +384,10 @@ def api_violations():
         
         violations_data = []
         for violation in violations:
+            # Get base64 image data directly from database
+            violation_image_base64 = db_manager.get_violation_image_base64(violation['violation_id'])
+            whole_frame_image_base64 = db_manager.get_whole_frame_image_base64(violation['violation_id'])
+            
             violations_data.append({
                 'violation_id': str(violation['violation_id']),
                 'session_name': violation['session_name'],
@@ -371,8 +401,8 @@ def api_violations():
                 'bbox_y1': violation['bbox_y1'],
                 'bbox_x2': violation['bbox_x2'],
                 'bbox_y2': violation['bbox_y2'],
-                'image_path': violation['screenshot_path'],  # Bounding box screenshot
-                'whole_frame_path': violation['whole_frame_path'],  # Whole frame screenshot
+                'violation_image_base64': violation_image_base64,  # Base64 encoded bounding box image
+                'whole_frame_image_base64': whole_frame_image_base64,  # Base64 encoded whole frame image
                 'acknowledged': violation['acknowledged'],
                 'acknowledged_by': violation['acknowledged_by'],
                 'acknowledged_at': violation['acknowledged_at'].isoformat() if violation['acknowledged_at'] else None,
@@ -427,19 +457,56 @@ def acknowledge_violation():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/cameras')
+def api_cameras():
+    """API endpoint to get camera information"""
+    try:
+        camera_info = []
+        
+        for i, rtsp_url in enumerate(RTSP_URLS, 1):
+            camera_info.append({
+                "id": i,
+                "camera_id": f"camera_{i}",
+                "name": f"Camera {i}",
+                "rtsp_url": rtsp_url,
+                "ip": rtsp_url.split('@')[1].split(':')[0] if '@' in rtsp_url else "Unknown",
+                "location": f"Location {i}",
+                "connectivity_status": "active",
+                "rtsp_status": "connected"
+            })
+        
+        return jsonify({
+            "status": True,
+            "cameras": camera_info,
+            "total": len(camera_info),
+            "last_updated": time.time(),
+            "source": "static_configuration"
+        })
+    except Exception as e:
+        return jsonify({"status": False, "error": str(e)}), 500
+
 @app.route('/api/camera_status')
 def camera_status():
     """API endpoint to get status of all cameras"""
+    current_urls = get_rtsp_urls()
     status = {}
-    for i in range(1, len(RTSP_URLS) + 1):
+    
+    for i in range(1, len(current_urls) + 1):
         is_running = i in camera_threads and camera_threads[i].is_alive()
+        camera_name = f'Camera {i}'
+        
         status[f"camera_{i}"] = {
             "running": is_running,
-            "rtsp_url": RTSP_URLS[i-1] if i-1 < len(RTSP_URLS) else None,
+            "name": camera_name,
+            "rtsp_url": current_urls[i-1] if i-1 < len(current_urls) else None,
             "thread_alive": camera_threads.get(i).is_alive() if i in camera_threads else False,
             "queue_size": camera_queues[i].qsize() if i in camera_queues else 0
         }
-    return jsonify(status)
+    return jsonify({
+        "status": status,
+        "static_config": True,
+        "total_cameras": len(current_urls)
+    })
 
 @app.route('/api/stop_cameras', methods=['POST'])
 def stop_cameras():
@@ -450,31 +517,28 @@ def stop_cameras():
 @app.route('/api/start_cameras', methods=['POST'])
 def start_cameras():
     """API endpoint to start all camera threads"""
+    global RTSP_URLS
+    
+    # Use static camera configuration
+    RTSP_URLS = get_rtsp_urls()
+    
+    if not RTSP_URLS:
+        return jsonify({"error": "No cameras configured"}), 400
+    
+    started_cameras = []
     for i, rtsp_url in enumerate(RTSP_URLS, 1):
         start_camera_thread(i, rtsp_url)
-    return jsonify({"message": "All cameras started"})
+        camera_name = f'Camera {i}'
+        started_cameras.append({"id": i, "name": camera_name, "url": rtsp_url})
+    
+    return jsonify({
+        "message": f"Started {len(started_cameras)} cameras",
+        "cameras": started_cameras
+    })
 
-@app.route('/api/whole_frame_image/<violation_id>')
-def get_whole_frame_image(violation_id):
-    """Serve whole frame image from filesystem with fallback to database"""
-    try:
-        db_manager = get_db_manager()
-        # First try to get image path from database
-        image_path = db_manager.get_whole_frame_image_path(violation_id)
-        
-        if image_path and os.path.exists(image_path):
-            from flask import send_file
-            return send_file(image_path, mimetype='image/jpeg')
-        else:
-            # Fallback to database stored image
-            image_data = db_manager.get_whole_frame_image(violation_id)
-            if image_data:
-                return Response(image_data, mimetype='image/jpeg')
-            else:
-                return "Image not found", 404
-            
-    except Exception as e:
-        return f"Error: {str(e)}", 500
+
+
+
 
 
 
