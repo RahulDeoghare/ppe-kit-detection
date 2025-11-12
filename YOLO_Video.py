@@ -53,15 +53,9 @@ def save_violation_to_json(violation_type, confidence, bbox, timestamp, person_i
 
 violation_tips = {
     'Hardhat': 'Wearing a hardhat protects you from head injuries caused by falling objects or impact.',
-    'Mask': 'Wearing a mask helps protect you and others from airborne hazards and infectious agents.',
     'NO-Hardhat': 'Not wearing a hardhat can lead to severe head injuries due to falling objects or impact.',
-    'NO-Mask': 'Not wearing a mask increases the risk of exposure to airborne hazards and infectious agents.',
-    'NO-Safety Vest': 'Not wearing a safety vest makes you less visible, increasing the risk of accidents in low-light conditions.',
     'Safety Vest': 'Wearing a safety vest ensures that you are visible to others, especially in low-light conditions.',
-    'Person': 'Ensure all safety gear is worn properly to avoid injuries.',
-    'Safety Cone': 'Safety cones help in marking safe areas and guiding pedestrian or vehicular traffic.',
-    'machinery': 'Machinery should be operated with care, ensuring all safety protocols are followed.',
-    'vehicle': 'Vehicles should be operated carefully in designated areas to prevent accidents.'
+    'NO-Safety Vest': 'Not wearing a safety vest makes you less visible, increasing the risk of accidents in low-light conditions.'
 }
 
 def log_time_taken(action, start_time):
@@ -138,8 +132,11 @@ def process_single_image(img, path_x, session_name, source_type, source_path, db
     
     # Move model to GPU if available
     model.to(device)
-    classNames = ['Hardhat', 'Mask', 'NO-Hardhat', 'NO-Mask', 'NO-Safety Vest', 'Person', 'Safety Cone',
-                  'Safety Vest', 'machinery', 'vehicle']
+    # Original full class list that matches the model training
+    full_classNames = ['Hardhat', 'Mask', 'NO-Hardhat', 'NO-Mask', 'NO-Safety Vest', 'Person', 'Safety Cone',
+                      'Safety Vest', 'machinery', 'vehicle']
+    # Classes we want to detect and process
+    target_classes = {'Hardhat', 'NO-Hardhat', 'Safety Vest', 'NO-Safety Vest'}
 
     # Validate and process the image
     if img is None or img.size == 0:
@@ -165,17 +162,19 @@ def process_single_image(img, path_x, session_name, source_type, source_path, db
                 x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
                 conf = math.ceil((box.conf[0] * 100)) / 100
                 cls = int(box.cls[0])
-                class_name = classNames[cls]
+                # Get class name from full list, but only process target classes
+                if cls >= len(full_classNames):
+                    continue  # Skip if class index is out of range
+                class_name = full_classNames[cls]
                 label = f'{class_name}{conf}'
 
-                if conf > 0.5:
-                    if class_name == 'Person':
+                if conf > 0.5 and class_name in target_classes:
+                    # For violation classes, increment person count and track violations
+                    if class_name in ['NO-Hardhat', 'NO-Safety Vest']:
                         person_count += 1
-                        persons_violations[person_count] = []
-                    
-                    elif class_name in ['NO-Hardhat', 'NO-Mask', 'NO-Safety Vest']:
-                        if person_count in persons_violations:
-                            persons_violations[person_count].append(class_name)
+                        if person_count not in persons_violations:
+                            persons_violations[person_count] = []
+                        persons_violations[person_count].append(class_name)
                         
                         # Save violation to JSON (keep for backward compatibility)
                         timestamp = datetime.now()
@@ -284,8 +283,11 @@ def process_video_stream(path_x, session_name, source_type, source_path, db_mana
     
     # Move model to GPU if available
     model.to(device)
-    classNames = ['Hardhat', 'Mask', 'NO-Hardhat', 'NO-Mask', 'NO-Safety Vest', 'Person', 'Safety Cone',
-                  'Safety Vest', 'machinery', 'vehicle']
+    # Original full class list that matches the model training
+    full_classNames = ['Hardhat', 'Mask', 'NO-Hardhat', 'NO-Mask', 'NO-Safety Vest', 'Person', 'Safety Cone',
+                      'Safety Vest', 'machinery', 'vehicle']
+    # Classes we want to detect and process
+    target_classes = {'Hardhat', 'NO-Hardhat', 'Safety Vest', 'NO-Safety Vest'}
 
     aggregated_violations = {}
     frame_count = 0
@@ -335,17 +337,19 @@ def process_video_stream(path_x, session_name, source_type, source_path, db_mana
                     x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
                     conf = math.ceil((box.conf[0] * 100)) / 100
                     cls = int(box.cls[0])
-                    class_name = classNames[cls]
+                    # Get class name from full list, but only process target classes
+                    if cls >= len(full_classNames):
+                        continue  # Skip if class index is out of range
+                    class_name = full_classNames[cls]
                     label = f'{class_name}{conf}'
 
-                    if conf > 0.5:
-                        if class_name == 'Person':
+                    if conf > 0.5 and class_name in target_classes:
+                        # For violation classes, increment person count and track violations
+                        if class_name in ['NO-Hardhat', 'NO-Safety Vest']:
                             person_count += 1
-                            persons_violations[person_count] = []
-                        
-                        elif class_name in ['NO-Hardhat', 'NO-Mask', 'NO-Safety Vest']:
-                            if person_count in persons_violations:
-                                persons_violations[person_count].append(class_name)
+                            if person_count not in persons_violations:
+                                persons_violations[person_count] = []
+                            persons_violations[person_count].append(class_name)
                             
                             # Save violation to JSON (keep for backward compatibility)
                             timestamp = datetime.now()

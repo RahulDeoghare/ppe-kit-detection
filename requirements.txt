@@ -25,6 +25,9 @@ python-dotenv>=0.19.0
 # Communication and Alerts
 twilio>=8.0.0
 
+# HTTP Requests
+requests>=2.28.0
+
 # Additional utilities (if needed)
 Pillow>=9.0.0
 matplotlib>=3.5.0

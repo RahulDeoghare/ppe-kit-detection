@@ -14,6 +14,8 @@ import threading
 import time
 from queue import Queue
 import atexit
+import subprocess
+import sys
 
 # Load environment variables
 load_dotenv()
@@ -138,6 +140,22 @@ def stop_all_camera_threads():
     stop_flags.clear()
     print("✅ All camera threads stopped")
 
+def launch_opencv_viewer():
+    """Launch the OpenCV camera grid viewer in a separate process"""
+    try:
+        # Get the path to the camera grid viewer script
+        script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'camera_grid_viewer.py')
+        
+        # Launch the viewer in a separate process
+        subprocess.Popen([sys.executable, script_path], 
+                        stdout=subprocess.DEVNULL, 
+                        stderr=subprocess.DEVNULL)
+        print("🖥️ Launched OpenCV Camera Grid Viewer")
+    except Exception as e:
+        print(f"❌ Failed to launch OpenCV viewer: {e}")
+
+
+
 def generate_frames_from_queue(camera_id):
     """Generate frames from the camera's queue for live viewing"""
     while True:
@@ -238,7 +256,8 @@ def home():
 
 # Hardcoded RTSP URLs for multi-camera live feed
 RTSP_URLS = [
-    "rtsp://admin:India123%23@10.45.1.63:5545/cam/realmonitor?channel=1&subtype=0" # Camera 1  # Camera 3
+    "rtsp://admin:India123%23@10.45.1.63:5545/cam/realmonitor?channel=1&subtype=0",
+    "rtsp://admin:India123%23@10.45.1.64:5543/cam/realmonitor?channel=1&subtype=0" # Camera 1  # Camera 3
 ]  # Replace with your actual RTSP URLs
 
 # Multi-camera support: UI for starting RTSP feeds
@@ -250,6 +269,11 @@ def webcam():
         print("🎬 Starting multi-camera background processing...")
         for i, rtsp_url in enumerate(RTSP_URLS, 1):
             start_camera_thread(i, rtsp_url)
+        
+        # Option to launch OpenCV viewer  
+        launch_opencv = request.form.get('launch_opencv', False)
+        if launch_opencv:
+            launch_opencv_viewer()
         
         session['rtsp_urls'] = RTSP_URLS
         return render_template('live_feed.html', rtsp_urls=RTSP_URLS)
@@ -349,7 +373,6 @@ def api_violations():
                 'unacknowledged_violations': session['unacknowledged_violations'],
                 'unique_persons': session['unique_persons'],
                 'no_hardhat_count': session['no_hardhat_count'],
-                'no_mask_count': session['no_mask_count'],
                 'no_vest_count': session['no_vest_count'],
                 'avg_confidence': float(session['avg_confidence']) if session['avg_confidence'] else 0.0
             })
@@ -451,6 +474,20 @@ def start_cameras():
     for i, rtsp_url in enumerate(RTSP_URLS, 1):
         start_camera_thread(i, rtsp_url)
     return jsonify({"message": "All cameras started"})
+
+@app.route('/api/launch_opencv_viewer', methods=['POST'])
+def api_launch_opencv_viewer():
+    """API endpoint to launch OpenCV viewer"""
+    try:
+        launch_opencv_viewer()
+        return jsonify({"message": "OpenCV viewer launched successfully"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/opencv_viewer')
+def opencv_viewer_page():
+    """Page to launch OpenCV viewer directly"""
+    return render_template('opencv_launcher.html')
 
 @app.route('/api/whole_frame_image/<violation_id>')
 def get_whole_frame_image(violation_id):

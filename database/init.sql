@@ -6,21 +6,14 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- Create enum types for violation categories
 CREATE TYPE violation_type AS ENUM (
     'NO-Hardhat',
-    'NO-Mask', 
     'NO-Safety Vest'
 );
 
 CREATE TYPE detection_class AS ENUM (
     'Hardhat',
-    'Mask',
     'NO-Hardhat',
-    'NO-Mask',
-    'NO-Safety Vest',
-    'Person',
-    'Safety Cone',
     'Safety Vest',
-    'machinery',
-    'vehicle'
+    'NO-Safety Vest'
 );
 
 -- Table to store detection sessions

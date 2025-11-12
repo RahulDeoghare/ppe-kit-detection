@@ -59,8 +59,11 @@ def ppe_detection(file):
     # Move model to GPU if available
     model.to(device)
 
+    # Original full class list that matches the model training
     classNames = ['Hardhat', 'Mask', 'NO-Hardhat', 'NO-Mask', 'NO-Safety Vest', 'Person', 'Safety Cone',
                 'Safety Vest', 'machinery', 'vehicle']
+    # Classes we want to detect and process
+    target_classes = {'Hardhat', 'NO-Hardhat', 'Safety Vest', 'NO-Safety Vest'}
     myColor = (0, 0, 255)
     frame_count = 0
     
@@ -85,29 +88,34 @@ def ppe_detection(file):
                 conf = math.ceil((box.conf[0] * 100)) / 100
 
                 cls = int(box.cls[0])
+                if cls >= len(classNames):
+                    continue  # Skip if class index is out of range
                 currentClass = classNames[cls]
-                print(currentClass)
-                if conf>0.5:
-                    if currentClass =='NO-Hardhat' or currentClass =='NO-Safety Vest' or currentClass == "NO-Mask":
-                        myColor = (0, 0,255)
-                        # Save violation to JSON
-                        timestamp = datetime.now()
-                        save_violation_to_json(
-                            violation_type=currentClass,
-                            confidence=conf,
-                            bbox=(x1, y1, x2, y2),
-                            timestamp=timestamp,
-                            frame_number=frame_count
-                        )
-                    elif currentClass =='Hardhat' or currentClass =='Safety Vest' or currentClass == "Mask":
-                        myColor =(0,255,0) 
-                    else:
-                        myColor = (255, 0, 0)  
+                
+                # Only process target classes
+                if currentClass in target_classes:
+                    print(currentClass)
+                    if conf>0.5:
+                        if currentClass =='NO-Hardhat' or currentClass =='NO-Safety Vest':
+                            myColor = (0, 0,255)
+                            # Save violation to JSON
+                            timestamp = datetime.now()
+                            save_violation_to_json(
+                                violation_type=currentClass,
+                                confidence=conf,
+                                bbox=(x1, y1, x2, y2),
+                                timestamp=timestamp,
+                                frame_number=frame_count
+                            )
+                        elif currentClass =='Hardhat' or currentClass =='Safety Vest':
+                            myColor =(0,255,0) 
+                        else:
+                            myColor = (255, 0, 0)  
 
-                    cvzone.putTextRect(img, f'{classNames[cls]} {conf}',
-                                    (max(0, x1), max(35, y1)), scale=1, thickness=1,colorB=myColor,
-                                    colorT=(255,255,255),colorR=myColor, offset=5)
-                    cv2.rectangle(img, (x1, y1), (x2, y2), myColor, 3)
+                        cvzone.putTextRect(img, f'{classNames[cls]} {conf}',
+                                        (max(0, x1), max(35, y1)), scale=1, thickness=1,colorB=myColor,
+                                        colorT=(255,255,255),colorR=myColor, offset=5)
+                        cv2.rectangle(img, (x1, y1), (x2, y2), myColor, 3)
 
         cv2.imshow("Image", img)
         if cv2.waitKey(1) & 0xFF == ord('q'):

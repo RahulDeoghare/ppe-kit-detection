@@ -347,7 +347,7 @@ class DatabaseManager:
                             COUNT(CASE WHEN acknowledged = false THEN 1 END) as unacknowledged_violations,
                             COUNT(DISTINCT person_id) as unique_persons,
                             COUNT(CASE WHEN violation_type = 'NO-Hardhat' THEN 1 END) as no_hardhat_count,
-                            COUNT(CASE WHEN violation_type = 'NO-Mask' THEN 1 END) as no_mask_count,
+
                             COUNT(CASE WHEN violation_type = 'NO-Safety Vest' THEN 1 END) as no_vest_count,
                             AVG(confidence) as avg_confidence
                         FROM ppe_violations 

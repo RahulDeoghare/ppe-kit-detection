@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenCV Camera Viewer Launcher</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 40px;
+            margin: 20px 0;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 20px;
+        }
+        .btn {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2em;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+        .btn-secondary {
+            background: linear-gradient(45deg, #3c40c6, #2c2c54);
+        }
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+        .status.success {
+            background: rgba(0, 255, 0, 0.2);
+            border: 1px solid #00ff00;
+        }
+        .status.error {
+            background: rgba(255, 0, 0, 0.2);
+            border: 1px solid #ff0000;
+        }
+        .instructions {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        .instructions h3 {
+            color: #ffd700;
+            margin-top: 0;
+        }
+        .instructions ul {
+            padding-left: 20px;
+        }
+        .instructions li {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎥 PPE Detection Camera Viewer</h1>
+        
+        <div class="card">
+            <h2>Launch OpenCV Direct Viewer</h2>
+            <p>Click the button below to open the camera streams directly in an OpenCV window</p>
+            
+            <button class="btn" onclick="launchOpenCVViewer()">
+                🚀 Launch OpenCV Viewer
+            </button>
+            
+            <button class="btn btn-secondary" onclick="window.location.href='/'">
+                🏠 Back to Home
+            </button>
+            
+            <div id="status" class="status"></div>
+        </div>
+        
+        <div class="instructions">
+            <h3>📖 Instructions</h3>
+            <ul>
+                <li><strong>Launch OpenCV Viewer:</strong> Opens a single window showing all camera feeds in a grid layout</li>
+                <li><strong>Direct View:</strong> No browser needed - view streams directly through OpenCV</li>
+                <li><strong>Keyboard Controls in OpenCV Window:</strong>
+                    <ul>
+                        <li><kbd>Q</kbd> - Quit the viewer</li>
+                        <li><kbd>R</kbd> - Restart all camera connections</li>
+                    </ul>
+                </li>
+                <li><strong>Grid Layout:</strong> Automatically arranges cameras in an optimal grid layout</li>
+                <li><strong>Real-time PPE Detection:</strong> Shows live detection results with bounding boxes</li>
+                <li><strong>Auto-restart:</strong> Automatic recovery from camera disconnections</li>
+                <li><strong>No Browser Required:</strong> Direct system-level window</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+            statusDiv.style.display = 'block';
+            
+            // Hide after 5 seconds
+            setTimeout(() => {
+                statusDiv.style.display = 'none';
+            }, 5000);
+        }
+        
+        function launchOpenCVViewer() {
+            showStatus('🚀 Launching OpenCV Viewer...', 'success');
+            
+            fetch('/api/launch_opencv_viewer', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showStatus('❌ Error: ' + data.error, 'error');
+                } else {
+                    showStatus('✅ ' + data.message + ' - Check for new window!', 'success');
+                }
+            })
+            .catch(error => {
+                showStatus('❌ Network error: ' + error.message, 'error');
+            });
+        }
+        
+        // Add keyboard shortcuts
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                launchOpenCVViewer();
+            }
+        });
+    </script>
+</body>
+</html>

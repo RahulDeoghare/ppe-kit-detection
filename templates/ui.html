@@ -206,7 +206,10 @@
             <i>📹</i> Video/Image
         </a>
         <a href="/webcam" class="nav-item">
-            <i>�</i> RTSP Feed
+            <i>📺</i> RTSP Feed
+        </a>
+        <a href="/opencv_viewer" class="nav-item">
+            <i>🖥️</i> OpenCV Viewer
         </a>
         <a href="/violations" class="nav-item">
             <i>⚠️</i> Violations
@@ -228,9 +231,11 @@
                 <div class="status-indicator">⚪ Ready to Start Multi-Camera Monitoring</div>
                 <div class="webcam-feed">
                     <p style="color: #7f8c8d; font-size: 16px; margin-bottom: 20px;">
-                        Click the button below to start monitoring all configured RTSP camera feeds simultaneously
+                        Choose your monitoring method:
                     </p>
-                    <form method="post" action="/webcam" style="display: inline;">
+                    
+                    <!-- Browser-based viewer -->
+                    <form method="post" action="/webcam" style="display: inline; margin: 10px;">
                         <button type="submit" style="
                             background-color: #27ae60;
                             color: white;
@@ -242,11 +247,37 @@
                             cursor: pointer;
                             transition: all 0.3s ease;
                             box-shadow: 0 4px 8px rgba(39, 174, 96, 0.3);
+                            margin: 5px;
                         " onmouseover="this.style.backgroundColor='#229954'" onmouseout="this.style.backgroundColor='#27ae60'">
-                            🚀 Start Multi-Camera Feed
+                            🌐 Start Browser Feed
                         </button>
                     </form>
+                    
+                    <!-- OpenCV direct viewer -->
+                    <button onclick="window.location.href='/opencv_viewer'" style="
+                        background-color: #3498db;
+                        color: white;
+                        border: none;
+                        padding: 15px 30px;
+                        font-size: 16px;
+                        font-weight: 600;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        box-shadow: 0 4px 8px rgba(52, 152, 219, 0.3);
+                        margin: 5px;
+                    " onmouseover="this.style.backgroundColor='#2980b9'" onmouseout="this.style.backgroundColor='#3498db'">
+                        🖥️ Launch Direct Viewer
+                    </button>
                 </div>
+                
+                <div style="margin: 20px 0; padding: 15px; background-color: #f8f9fa; border-radius: 8px; border-left: 4px solid #3498db;">
+                    <p style="color: #2c3e50; font-size: 14px; margin: 0;">
+                        <strong>🌐 Browser Feed:</strong> View streams in your web browser with web interface<br>
+                        <strong>🖥️ Direct Viewer:</strong> Open streams directly in single OpenCV window (no browser needed)
+                    </p>
+                </div>
+                
                 <p style="color: #7f8c8d; font-size: 14px; margin-top: 15px;">
                     Real-time PPE violation detection powered by YOLOv8 AI technology across multiple cameras
                 </p>
